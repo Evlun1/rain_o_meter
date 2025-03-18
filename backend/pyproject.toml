@@ -1,0 +1,35 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Rain o meter backend"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi[standard]>=0.115.11",
+    "pandera[polars]>=0.23.1",
+    "polars>=1.25.2",
+    "requests>=2.32.3",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.5",
+    "ruff>=0.11.0",
+    "taskipy>=1.14.1",
+]
+
+[tool.mypy]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+pythonpath = [
+  "src"
+]
+
+[tool.taskipy.tasks]
+dev = { cmd = "fastapi dev src/main.py", help = "runs fastapi dev server" }
+test = { cmd = "pytest", help = "runs all tests" }
+format = { cmd = "ruff format", help = "formats code" }
+lint = { cmd = "ruff check", help = "lints code" }
+mypy = { cmd = "mypy src tests", help = "type checks code" }
+quality = { cmd = "task format && task lint && task mypy", help = "runs all quality checks" }
