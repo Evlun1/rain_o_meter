@@ -1,16 +1,31 @@
 from datetime import date, timedelta
 from pathlib import Path
-from core.entities import STATION_ID, RainCompleteInfo, RainStore, TimespanId
+from core.entities import (
+    STATION_ID,
+    RainCompleteInfo,
+    RainStore,
+    TimespanId,
+    BulkFileSchema,
+    CurrentFileSchema,
+)
 from core.exceptions import AlreadyInitialized
 from core.protocol import DataFileProtocol, KeyValueDbProtocol
 
 import polars as pl
-import pandera as pa
 
 
 def get_data(
     key_value_db_repo: KeyValueDbProtocol, last_data_day: date
 ) -> RainCompleteInfo:
+    """
+    Get all data useful for front display. This assumes all data is already cached.
+
+    Args :
+    - key_value_db_repo : cache db backend repository
+    - last_data_day, date : last known date to fetch data for
+    Returns :
+    - RainCompleteInfo : object with all info for frontend
+    """
     month_beg = date(last_data_day.year, last_data_day.month, 1)
     prev_30_days = last_data_day - timedelta(days=30)
     last_day_tsid: TimespanId = (
@@ -50,6 +65,17 @@ def get_data(
 
 
 def _compute_daily_data(file_path: Path, this_day: date) -> tuple[float, float, float]:
+    """
+    Extracts all daily data : this day rain, this month rain and last 31 days rain.
+
+    Args :
+    - file_path, Path : path to read CSV file with daily data
+    - this_day, date : day to consider data from
+    Returns :
+    - float : this day rain
+    - float : this month rain
+    - float : last 31 days cumulated rain
+    """
     current_data_df = pl.read_csv(
         file_path,
         has_header=True,
@@ -57,7 +83,9 @@ def _compute_daily_data(file_path: Path, this_day: date) -> tuple[float, float, 
         new_columns=["date", "rainfall_mm"],
         separator=";",
         decimal_comma=True,
-    ).select(
+    )
+    CurrentFileSchema.validate(current_data_df)
+    current_data_df = current_data_df.select(
         pl.col("date").cast(pl.String).str.strptime(pl.Date, format="%Y%m%d"),
         pl.col("rainfall_mm"),
     )
@@ -73,11 +101,21 @@ def _compute_daily_data(file_path: Path, this_day: date) -> tuple[float, float, 
     return this_day_rain, this_month_rain, last_31_days_rain
 
 
-def fetch_data_if_not_in_cache(
+def fetch_daily_data_if_not_in_cache(
     key_value_db_repo: KeyValueDbProtocol,
     data_file_repo: DataFileProtocol,
     last_data_day: date,
 ) -> None:
+    """
+    Checks if data for last_day is in cache, and if not, fetch it and store it.
+
+    Args :
+    - key_value_db_repo : cache db backend repository
+    - data_file_repo : download data backend repository
+    - last_data_day, date : last known date to check data for
+    Returns :
+    - None
+    """
     last_day_tsid: TimespanId = (
         f"{last_data_day.strftime('%Y%m%d')}-{last_data_day.strftime('%Y%m%d')}"
     )
@@ -86,10 +124,12 @@ def fetch_data_if_not_in_cache(
     if not key_value_db_repo.has(last_day_tsid):
         month_beg = date(last_data_day.year, last_data_day.month, 1)
         prev_30_days = last_data_day - timedelta(days=30)
-        daily_file_path = data_file_repo.get_daily_file_path(begin_date=prev_30_days)
-        last_day_rain_mm, since_month_beg_mm, last_31_days_mm = _compute_daily_data(
-            daily_file_path, last_data_day
-        )
+        with data_file_repo.get_daily_file_path(
+            begin_date=prev_30_days
+        ) as daily_file_path:
+            last_day_rain_mm, since_month_beg_mm, last_31_days_mm = _compute_daily_data(
+                daily_file_path, last_data_day
+            )
         since_month_beg_tsid: TimespanId = (
             f"{month_beg.strftime('%Y%m%d')}-{last_data_day.strftime('%Y%m%d')}"
         )
@@ -105,20 +145,19 @@ def fetch_data_if_not_in_cache(
         )
 
 
-class BulkFileSchema(pa.DataFrameModel):
-    station_id: int = pa.Field(
-        in_range={"min_value": 75e6, "max_value": 76e6}, nullable=False
-    )
-    station_name: str
-    date: int = pa.Field(
-        in_range={"min_value": 19500101, "max_value": 20250101}, nullable=False
-    )
-    rainfall_mm: float = pa.Field(ge=0, nullable=True)
-
-
 def _preprocess_bulk_data(
     df: pl.DataFrame, begin_date: date, end_date: date
 ) -> pl.DataFrame:
+    """
+    Preprocess raw bulk data file. Bit of filtering and renaming.
+
+    Args :
+    - df, pl.DataFrame : bulk data df
+    - begin_date, date : date to keep measurements from
+    - end_date, date : date to keep measurements until
+    Returns :
+    - pl.DataFrame : for selected station_id only and between begin and end dates
+    """
     prep_df = (
         df.select(
             pl.col("station_id"),
@@ -140,8 +179,28 @@ def _preprocess_bulk_data(
 
 
 def _get_mean_data_between_two_mon_day_dates(
-    df, beg_mon, beg_day, end_mon, end_day
+    df: pl.DataFrame,
+    beg_mon: int,
+    beg_day: int,
+    end_mon: int,
+    end_day: int,
+    number_of_years: int,
 ) -> float:
+    """
+    Compute mean cumulated rain data on df between two dates.
+
+    Dates are in month and day only as we average it on multiple years.
+
+    Args :
+    - df, pl.DataFrame : df with data to average
+    - beg_mon, int : month of period to begin average
+    - beg_day, int : day of period to begin average
+    - end_mon, int : month of period to end average
+    - end_day, int : day of period to end average
+    - number_of_years, int : number of years of data in df
+    Returns :
+    - float : Mean rainfall on considered period, at tenth of mm
+    """
     year_offset = 1 if (beg_mon, beg_day) > (end_mon, end_day) else 0
     date_beg = date(2020, beg_mon, beg_day)
     date_end = date(2020 + year_offset, end_mon, end_day)
@@ -155,11 +214,26 @@ def _get_mean_data_between_two_mon_day_dates(
         )
     )
     joined_df = df.join(date_df, on=["month", "day"], how="inner")
-    number_of_years = 1 + (df["date"].max().year - df["date"].min().year)
     return round(joined_df["rainfall_mm"].sum() / number_of_years, 1)
 
 
-def _append_means(df: pl.DataFrame, means: list[RainStore], this_day: date) -> None:
+def _compute_history_means(
+    df: pl.DataFrame, this_day: date, number_of_years: int
+) -> tuple[float, float]:
+    """
+    Compute history averages since beginning of month and last 31 days.
+
+    This works with dataframes with complete year data, otherwise there can
+    be some side effects for periods between years.
+
+    Args :
+    - df, pl.DataFrame: df with data to average
+    - this_day, date : end day for both periods
+    - number_of_years, int : number of years in df
+    Returns :
+    - float : average on beg_month-this_day period
+    - float : average on prev_30_days-this_day period
+    """
     mean_month_beg_tsid: TimespanId = (
         f"M{this_day.strftime('%m')}01-M{this_day.strftime('%m%d')}"
     )
@@ -167,21 +241,21 @@ def _append_means(df: pl.DataFrame, means: list[RainStore], this_day: date) -> N
     mean_30_days_tsid: TimespanId = (
         f"M{prev_30_days.strftime('%m%d')}-M{this_day.strftime('%m%d')}"
     )
-    means.append(
-        RainStore(
-            timespan_id=mean_month_beg_tsid,
-            rain_mm=_get_mean_data_between_two_mon_day_dates(
-                df, this_day.month, 1, this_day.month, this_day.day
-            ),
-        )
-    )
-    means.append(
-        RainStore(
-            timespan_id=mean_30_days_tsid,
-            rain_mm=_get_mean_data_between_two_mon_day_dates(
-                df, prev_30_days.month, prev_30_days.day, this_day.month, this_day.day
-            ),
-        )
+    return RainStore(
+        timespan_id=mean_month_beg_tsid,
+        rain_mm=_get_mean_data_between_two_mon_day_dates(
+            df, this_day.month, 1, this_day.month, this_day.day, number_of_years
+        ),
+    ), RainStore(
+        timespan_id=mean_30_days_tsid,
+        rain_mm=_get_mean_data_between_two_mon_day_dates(
+            df,
+            prev_30_days.month,
+            prev_30_days.day,
+            this_day.month,
+            this_day.day,
+            number_of_years,
+        ),
     )
 
 
@@ -191,6 +265,17 @@ def initialize_mean_data(
     year_beg_incl: int,
     year_end_incl: int,
 ) -> None:
+    """
+    Initialize mean data : fetch history file, compute means and store them.
+
+    Args :
+    - key_value_db_repo : cache db backend repository
+    - data_file_repo : download data backend repository
+    - year_beg_incl, int : year to begin averaging data from (included)
+    - year_end_incl, int : year to end averaging data until (INCLUDED)
+    Returns :
+    - none
+    """
     beginning_tsid: TimespanId = "M0101-M0101"
     if key_value_db_repo.has(beginning_tsid):
         raise AlreadyInitialized
@@ -198,22 +283,26 @@ def initialize_mean_data(
     begin_date = date(year_beg_incl, 1, 1)
     end_date = date(year_end_incl, 12, 31)
 
-    bulk_file_path = data_file_repo.get_bulk_file_path()
-    bulk_file_df = pl.read_csv(
-        bulk_file_path,
-        has_header=True,
-        columns=["NUM_POSTE", "NOM_USUEL", "AAAAMMJJ", "RR"],
-        new_columns=["station_id", "station_name", "date", "rainfall_mm"],
-        separator=";",
-    )
+    with data_file_repo.get_bulk_file_path() as bulk_file_path:
+        bulk_file_df = pl.read_csv(
+            bulk_file_path,
+            has_header=True,
+            columns=["NUM_POSTE", "AAAAMMJJ", "RR"],
+            new_columns=["station_id", "date", "rainfall_mm"],
+            separator=";",
+        )
     BulkFileSchema.validate(bulk_file_df)
     prep_df = _preprocess_bulk_data(bulk_file_df, begin_date, end_date)
 
     rain_means: list[RainStore] = []
+    number_of_years = 1 + (prep_df["date"].max().year - prep_df["date"].min().year)
 
     for day in pl.date_range(
         date(2000, 1, 1), date(2000, 12, 31), "1d", eager=True
     ).to_list():
-        _append_means(prep_df, rain_means, day)
+        mean_beg_month, mean_last_31_days = _compute_history_means(
+            prep_df, rain_means, day, number_of_years
+        )
+        rain_means.extend([mean_beg_month, mean_last_31_days])
 
     key_value_db_repo.post(rains=rain_means)

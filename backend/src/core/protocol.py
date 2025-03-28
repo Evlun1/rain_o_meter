@@ -1,8 +1,10 @@
-from typing import Protocol
+from typing import Generator, Protocol
 
 from core.entities import RainStore, TimespanId
 from datetime import date
 from pathlib import Path
+
+from contextlib import contextmanager
 
 
 class KeyValueDbProtocol(Protocol):
@@ -16,6 +18,8 @@ class KeyValueDbProtocol(Protocol):
 class DataFileProtocol(Protocol):
     def get_last_data_date(self) -> date: ...
 
-    def get_daily_file_path(self) -> Path: ...
+    @contextmanager
+    def get_daily_file_path(self, begin_date: date) -> Generator[Path, None, None]: ...
 
-    def get_bulk_file_path(self) -> Path: ...
+    @contextmanager
+    def get_bulk_file_path(self) -> Generator[Path, None, None]: ...

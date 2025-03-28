@@ -2,6 +2,7 @@ from datetime import date
 from typing import Annotated
 from pydantic import BaseModel, Field
 from decimal import Decimal
+import pandera.polars as pa
 
 
 STATION_ID = 75114001  # Montsouris old weather station
@@ -47,3 +48,20 @@ class RainStore(BaseModel):
     rain_mm: Decimal = Field(
         ge=0, decimal_places=1, description="Rained amount for timespan"
     )
+
+
+class BulkFileSchema(pa.DataFrameModel):
+    station_id: int = pa.Field(
+        in_range={"min_value": 75e6, "max_value": 76e6}, nullable=False
+    )
+    date: int = pa.Field(
+        in_range={"min_value": 19500101, "max_value": 20250101}, nullable=False
+    )
+    rainfall_mm: float = pa.Field(ge=0, nullable=True)
+
+
+class CurrentFileSchema(pa.DataFrameModel):
+    date: int = pa.Field(
+        in_range={"min_value": 20250101, "max_value": 20990101}, nullable=False
+    )
+    rainfall_mm: float = pa.Field(ge=0, nullable=False)
