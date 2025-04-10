@@ -8,12 +8,13 @@ from core.service import (
     _get_mean_data_between_two_mon_day_dates,
     _compute_history_means,
     initialize_mean_data,
+    get_last_data_date,
 )
 from core.entities import RainCompleteInfo, RainStore
 from core.protocol import KeyValueDbProtocol, DataFileProtocol
 from pathlib import Path
 from pandera.errors import SchemaError
-from core.exceptions import AlreadyInitialized
+from core.exceptions import AlreadyAddedData, AlreadyInitialized
 
 
 import datetime as dt
@@ -120,10 +121,10 @@ class TestFetchDailyDataIfNotInCache:
     def test_fetch_daily_data_already_in_cache(self, data_file_repo, key_value_db_repo):
         input_last_data_day = dt.date(2025, 4, 2)
         key_value_db_repo.has.return_value = True
-        fetch_daily_data_if_not_in_cache(
-            key_value_db_repo, data_file_repo, input_last_data_day
-        )
-        key_value_db_repo.post.assert_not_called()
+        with pytest.raises(AlreadyAddedData):
+            fetch_daily_data_if_not_in_cache(
+                key_value_db_repo, data_file_repo, input_last_data_day
+            )
 
 
 class TestPreprocessBulkData:
@@ -299,3 +300,11 @@ class TestInitializeMeanData:
                 input_year_beg_incl,
                 input_year_end_incl,
             )
+
+
+class TestGetLastDataDate:
+    def test_get_last_data_date(self, data_file_repo):
+        data_file_repo.get_last_data_date.return_value = dt.date(2025, 4, 1)
+        result = get_last_data_date(data_file_repo)
+        data_file_repo.get_last_data_date.assert_called_once()
+        assert result == dt.date(2025, 4, 1)

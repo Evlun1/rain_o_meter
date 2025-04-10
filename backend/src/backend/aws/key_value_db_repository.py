@@ -1,0 +1,9 @@
+from core.entities import RainStore, TimespanId
+
+
+class KeyValueDbRepository:
+    def get(self, keys: list[TimespanId]) -> dict[TimespanId, float]: ...
+
+    def has(self, key: TimespanId) -> bool: ...
+
+    def post(self, rains: list[RainStore]) -> None: ...

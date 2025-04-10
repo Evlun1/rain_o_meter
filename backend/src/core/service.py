@@ -8,7 +8,7 @@ from core.entities import (
     BulkFileSchema,
     CurrentFileSchema,
 )
-from core.exceptions import AlreadyInitialized
+from core.exceptions import AlreadyAddedData, AlreadyInitialized
 from core.protocol import DataFileProtocol, KeyValueDbProtocol
 
 import polars as pl
@@ -121,28 +121,28 @@ def fetch_daily_data_if_not_in_cache(
     )
 
     # If daily data not in cache, compute it
-    if not key_value_db_repo.has(last_day_tsid):
-        month_beg = date(last_data_day.year, last_data_day.month, 1)
-        prev_30_days = last_data_day - timedelta(days=30)
-        with data_file_repo.get_daily_file_path(
-            begin_date=prev_30_days
-        ) as daily_file_path:
-            last_day_rain_mm, since_month_beg_mm, last_31_days_mm = _compute_daily_data(
-                daily_file_path, last_data_day
-            )
-        since_month_beg_tsid: TimespanId = (
-            f"{month_beg.strftime('%Y%m%d')}-{last_data_day.strftime('%Y%m%d')}"
+    if key_value_db_repo.has(last_day_tsid):
+        raise AlreadyAddedData
+
+    month_beg = date(last_data_day.year, last_data_day.month, 1)
+    prev_30_days = last_data_day - timedelta(days=30)
+    with data_file_repo.get_daily_file_path(begin_date=prev_30_days) as daily_file_path:
+        last_day_rain_mm, since_month_beg_mm, last_31_days_mm = _compute_daily_data(
+            daily_file_path, last_data_day
         )
-        last_31_days_tsid: TimespanId = (
-            f"{prev_30_days.strftime('%Y%m%d')}-{last_data_day.strftime('%Y%m%d')}"
-        )
-        key_value_db_repo.post(
-            [
-                RainStore(timespan_id=last_day_tsid, rain_mm=last_day_rain_mm),
-                RainStore(timespan_id=since_month_beg_tsid, rain_mm=since_month_beg_mm),
-                RainStore(timespan_id=last_31_days_tsid, rain_mm=last_31_days_mm),
-            ]
-        )
+    since_month_beg_tsid: TimespanId = (
+        f"{month_beg.strftime('%Y%m%d')}-{last_data_day.strftime('%Y%m%d')}"
+    )
+    last_31_days_tsid: TimespanId = (
+        f"{prev_30_days.strftime('%Y%m%d')}-{last_data_day.strftime('%Y%m%d')}"
+    )
+    key_value_db_repo.post(
+        [
+            RainStore(timespan_id=last_day_tsid, rain_mm=last_day_rain_mm),
+            RainStore(timespan_id=since_month_beg_tsid, rain_mm=since_month_beg_mm),
+            RainStore(timespan_id=last_31_days_tsid, rain_mm=last_31_days_mm),
+        ]
+    )
 
 
 def _preprocess_bulk_data(
@@ -306,3 +306,7 @@ def initialize_mean_data(
         rain_means.extend([mean_beg_month, mean_last_31_days])
 
     key_value_db_repo.post(rains=rain_means)
+
+
+def get_last_data_date(data_file_repo: DataFileProtocol) -> date:
+    return data_file_repo.get_last_data_date()
