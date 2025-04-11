@@ -1,26 +1,11 @@
 import pytest
-from moto import mock_aws
 from mypy_boto3_dynamodb import DynamoDBClient, DynamoDBServiceResource
 from backend.aws.dynamodb_service import (
     get_items,
     write_items,
     has_item,
-    get_aws_client,
-    get_aws_resource,
 )
 from src.settings import Settings
-
-
-@pytest.fixture
-def ddb_client():
-    with mock_aws():
-        yield get_aws_client()
-
-
-@pytest.fixture
-def ddb_resource():
-    with mock_aws():
-        yield get_aws_resource()
 
 
 @pytest.fixture
