@@ -1,11 +1,13 @@
 from functools import cache
+
+import boto3
 from mypy_boto3_dynamodb import DynamoDBClient, DynamoDBServiceResource
 from mypy_boto3_dynamodb.type_defs import (
     BatchGetItemInputTypeDef,
     BatchGetItemOutputTypeDef,
     GetItemOutputTypeDef,
 )
-import boto3
+
 from settings import get_api_settings
 
 settings = get_api_settings()

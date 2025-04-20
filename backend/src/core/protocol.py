@@ -1,18 +1,46 @@
+from contextlib import contextmanager
+from datetime import date
+from pathlib import Path
 from typing import Generator, Protocol
 
 from core.entities import RainStore, TimespanId
-from datetime import date
-from pathlib import Path
-
-from contextlib import contextmanager
 
 
 class KeyValueDbProtocol(Protocol):
-    def get(self, keys: list[TimespanId]) -> dict[TimespanId, float]: ...
+    def get(self, keys: list[TimespanId]) -> dict[TimespanId, float]:
+        """
+        Get values corresponding to keys of KeyValueDb.
 
-    def has(self, key: TimespanId) -> bool: ...
+        We assume values exist in Db.
 
-    def post(self, rains: list[RainStore]) -> None: ...
+        Args:
+        - keys, list[TimespanId]: keys to get values
+        Returns:
+        - dict[TimespanId, float]: dict with input keys & corresponding values
+        """
+        ...
+
+    def has(self, key: TimespanId) -> bool:
+        """
+        Checks if KeyValueDb has corresponding key.
+
+        Args:
+        - key, TimespanId: key to check existence in backend
+        Returns:
+        - bool: is the key in Db
+        """
+        ...
+
+    def post(self, rains: list[RainStore]) -> None:
+        """
+        Post new rain values to backend key value db.
+
+        Args:
+        - rains, list[RainStore]: rain values to store in backend
+        Returns:
+        - None
+        """
+        ...
 
 
 class DataFileProtocol(Protocol):

@@ -2,16 +2,19 @@ from datetime import date
 from typing import Union
 
 from fastapi import FastAPI
+from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.param_functions import Depends
 from fastapi.responses import JSONResponse  # type: ignore
+from mangum import Mangum
+
+import core.service as core_service
+from backend.aws.key_value_db_repository import KeyValueDbRepository
+from backend.meteofrance.data_file_repository import DataFileRepository
 from core.entities import RainCompleteInfo
 from core.exceptions import AlreadyAddedData, AlreadyInitialized
 from core.protocol import DataFileProtocol, KeyValueDbProtocol
-import core.service as core_service
-from fastapi.exceptions import HTTPException
 from settings import get_api_settings
-from mangum import Mangum
 
 settings = get_api_settings()
 

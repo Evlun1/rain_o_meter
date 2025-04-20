@@ -1,9 +1,9 @@
 from datetime import date
-from typing import Annotated
-from pydantic import BaseModel, Field
 from decimal import Decimal
-import pandera.polars as pa
+from typing import Annotated
 
+import pandera.polars as pa
+from pydantic import BaseModel, Field
 
 STATION_ID = 75114001  # Montsouris old weather station
 

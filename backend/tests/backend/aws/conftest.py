@@ -1,5 +1,6 @@
 import pytest
 from moto import mock_aws
+
 from backend.aws.dynamodb_service import get_aws_client, get_aws_resource
 
 

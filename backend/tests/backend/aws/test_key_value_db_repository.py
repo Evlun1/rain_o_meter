@@ -1,5 +1,6 @@
-from mypy_boto3_dynamodb import DynamoDBClient, DynamoDBServiceResource
 import pytest
+from mypy_boto3_dynamodb import DynamoDBClient, DynamoDBServiceResource
+
 from backend.aws.key_value_db_repository import KeyValueDbRepository
 from core.entities import RainStore
 

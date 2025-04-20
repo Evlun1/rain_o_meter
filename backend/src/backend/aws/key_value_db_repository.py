@@ -1,14 +1,16 @@
 from typing import Self
+
 from fastapi.param_functions import Depends
-from core.entities import RainStore, TimespanId
 from mypy_boto3_dynamodb import DynamoDBClient, DynamoDBServiceResource
+
 from backend.aws.dynamodb_service import (
     get_aws_client,
     get_aws_resource,
     get_items,
-    write_items,
     has_item,
+    write_items,
 )
+from core.entities import RainStore, TimespanId
 
 
 class KeyValueDbRepository:

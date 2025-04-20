@@ -1,5 +1,6 @@
 from enum import StrEnum, auto
 from functools import lru_cache
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,6 +25,10 @@ class Settings(BaseSettings):
     backend_table_name: str = "rainfall"
     backend_table_key_name: str = "timestamp_id"
     backend_table_value_name: str = "rain_mm"
+    mf_token_url: str = "https://portail-api.meteofrance.fr/token"
+    mf_climate_app_id: str
+    mf_climate_app_url: str = "https://public-api.meteofrance.fr/public/DPClim/v1"
+    dgf_historical_data_url: str = "https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/QUOT/Q_75_previous-1950-2023_RR-T-Vent.csv.gz"  # noqa
 
     @property
     def cors_origins(self) -> list[str]:

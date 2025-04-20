@@ -1,17 +1,18 @@
 from datetime import date, timedelta
 from pathlib import Path
+
+import polars as pl
+
 from core.entities import (
     STATION_ID,
+    BulkFileSchema,
+    CurrentFileSchema,
     RainCompleteInfo,
     RainStore,
     TimespanId,
-    BulkFileSchema,
-    CurrentFileSchema,
 )
 from core.exceptions import AlreadyAddedData, AlreadyInitialized
 from core.protocol import DataFileProtocol, KeyValueDbProtocol
-
-import polars as pl
 
 
 def get_data(

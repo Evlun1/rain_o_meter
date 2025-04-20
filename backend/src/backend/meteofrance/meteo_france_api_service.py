@@ -1,0 +1,106 @@
+import datetime as dt
+
+import requests as rq
+from cachetools import TTLCache, cached
+from fastapi import HTTPException
+
+from settings import get_api_settings
+
+settings = get_api_settings()
+
+ID_STATION = "75114001"  # Paris Montsouris
+COMPUTE_DAILY_DATA_ROUTE = "commande-station/quotidienne"
+DOWNLOAD_ROUTE = "commande/fichier"
+
+
+def get_last_mfapi_data_date() -> dt.date:
+    """
+    Get latest data date available according to current time.
+
+    According to official documentation on the API, on a given date D, new data
+    for D-1 is available after 11:30 UT (where UT ~ UTC).
+    We give it a 5min benefit to be sure it is updated correctly.
+    https://portail-api.meteofrance.fr/web/fr/DonneesPubliquesClimatologie/documentation  # noqa
+
+    Args:
+    - None
+    Returns:
+    - date: last data date available on DataFile backend
+    """
+    now = dt.datetime.now(dt.timezone.utc)
+    delta_days = 2 if now.time() < dt.time(11, 35, 00) else 1
+    return now.date() - dt.timedelta(days=delta_days)
+
+
+@cached(cache=TTLCache(maxsize=1, ttl=3600))
+def get_mf_access_token() -> str:
+    """
+    Get access token to authentify to Meteo France API.
+
+    Tokens last one hour, and should be fetched through a Depends operation.
+
+    Args:
+    - None
+    Returns:
+    - str: token to use, valid one hour
+    """
+    data = {"grant_type": "client_credentials"}
+    headers = {"Authorization": "Basic " + settings.mf_climate_app_id}
+    access_token_response = rq.post(
+        settings.mf_token_url, data=data, allow_redirects=False, headers=headers
+    )
+    return access_token_response.json()["access_token"]
+
+
+def launch_daily_data_computation(begin_date: dt.date, token: str) -> str:
+    """
+    Launch daily data computation.
+
+    Meteo France backend has an asynchronous data request based on a compute demand
+    (this function) and only then a results fetch (following function).
+
+    Args:
+    - begin_date, dt.date: date to begin computations from
+    - token, str: token to identify this app
+    Returns:
+    - str: the id of the requested data computation
+    """
+    begin_time = begin_date.strftime("%Y-%m-%dT%H:%M:%SZ")
+    end_time = get_last_mfapi_data_date().strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    launch_computation = rq.get(
+        url=f"{settings.mf_climate_app_url}/{COMPUTE_DAILY_DATA_ROUTE}",
+        params={
+            "id-station": ID_STATION,
+            "date-deb-periode": begin_time,
+            "date-fin-periode": end_time,
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    if (sc := launch_computation.status_code) // 100 > 2:
+        raise HTTPException(status_code=sc, detail=launch_computation.text)
+
+    return launch_computation.json()["elaboreProduitAvecDemandeResponse"]["return"]
+
+
+def fetch_daily_data_computation_results(id_command: str, token: str) -> str:
+    """
+    Fetch daily data computation results.
+
+    Args:
+    - id_command, str: the id of the requested data computation
+    - token, str: token to identify this app
+    Returns:
+    - str: result CSV file as string
+    """
+    result_computation = rq.get(
+        url=f"{settings.mf_climate_app_url}/{DOWNLOAD_ROUTE}",
+        params={"id-cmde": id_command},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    if (sc := result_computation.status_code) // 100 > 2:
+        raise HTTPException(status_code=sc, detail=result_computation.text)
+
+    return result_computation.text

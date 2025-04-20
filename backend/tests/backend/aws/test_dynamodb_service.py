@@ -1,21 +1,10 @@
-import pytest
 from mypy_boto3_dynamodb import DynamoDBClient, DynamoDBServiceResource
+
 from backend.aws.dynamodb_service import (
     get_items,
-    write_items,
     has_item,
+    write_items,
 )
-from src.settings import Settings
-
-
-@pytest.fixture
-def settings():
-    return Settings(
-        _env_file=".env",
-        backend_table_name="test_table",
-        backend_table_key_name="test_key",
-        backend_table_value_name="test_value",
-    )
 
 
 def test_get_items(mocker, ddb_client: DynamoDBClient, settings):
