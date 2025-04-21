@@ -41,7 +41,7 @@ def test_get_daily_file_path(mocker, data_file_repository):
     results_mock.assert_called_once_with(id_command="id9", token="id1234")
 
 
-def test_get_bulf_file_path(mocker, data_file_repository):
+def test_get_bulk_file_path(mocker, data_file_repository):
     expected_contents = bytes("RR\n55", "utf8")
     content_mock = mocker.patch(
         "backend.meteofrance.data_file_repository.get_bulk_file_content",

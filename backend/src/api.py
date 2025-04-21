@@ -1,7 +1,6 @@
 from datetime import date
-from typing import Union
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.param_functions import Depends
@@ -35,16 +34,6 @@ app_with_middleware = CORSMiddleware(
 handler = Mangum(app_with_middleware)
 
 
-@app.get("/")
-def read_root():
-    return {"Hello": "World"}
-
-
-@app.get("/items/{item_id}")
-def read_item(item_id: int, q: Union[str, None] = None):
-    return {"item_id": item_id, "q": q}
-
-
 class AlreadyInitializedHTTPException(HTTPException):
     """Exception raised when the data is already initialized."""
 
@@ -70,7 +59,7 @@ async def get_last_data_day(
 
 
 @app.get(
-    "/get",
+    "/",
     response_class=JSONResponse,
     response_model=RainCompleteInfo,
     description="Get all mandatory data to display in front.",
@@ -108,6 +97,7 @@ async def add(
         )
     except AlreadyAddedData as exc:
         raise AlreadyAddedDataHTTPException(detail=exc.message)
+    return Response(status_code=201)
 
 
 @app.get(
@@ -134,3 +124,4 @@ async def initialize(
         )
     except AlreadyInitialized as exc:
         raise AlreadyInitializedHTTPException(detail=exc.message)
+    return Response(status_code=201)
