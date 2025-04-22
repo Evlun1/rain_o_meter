@@ -1,10 +1,10 @@
-import tempfile
 from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
 from typing import AsyncGenerator
 
 from aiohttp import ClientSession
+from anyio import open_file, TemporaryDirectory
 from fastapi.param_functions import Depends
 
 from backend.meteofrance.data_gouv_service import get_bulk_file_content
@@ -53,11 +53,11 @@ class DataFileRepository:
         results = await fetch_daily_data_computation_results(
             session=self.session, id_command=id_command, token=self.mf_api_token
         )
-        with tempfile.TemporaryDirectory() as tmp_dir_name:
+        async with TemporaryDirectory() as tmp_dir_name:
             daily_file_name = "daily_file.csv"
             daily_file_path = Path(tmp_dir_name, daily_file_name)
-            with open(daily_file_path, "w") as daily_file:
-                daily_file.write(results)
+            async with await open_file(daily_file_path, "w") as daily_file:
+                await daily_file.write(results)
             yield daily_file_path
 
     @asynccontextmanager
@@ -70,10 +70,10 @@ class DataFileRepository:
         Yields:
         - Path: temporary path of bulk data fetched file
         """
-        content = get_bulk_file_content(session=self.session)
-        with tempfile.TemporaryDirectory() as tmp_dir_name:
+        content = await get_bulk_file_content(session=self.session)
+        async with TemporaryDirectory() as tmp_dir_name:
             bulk_file_name = "bulk_file.csv.gz"
             bulk_file_path = Path(tmp_dir_name, bulk_file_name)
-            with open(bulk_file_path, "wb") as bulk_file:
-                bulk_file.write(content)
+            async with await open_file(bulk_file_path, "wb") as bulk_file:
+                await bulk_file.write(content)
             yield bulk_file_path
