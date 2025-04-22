@@ -7,7 +7,7 @@ from core.entities import RainStore, TimespanId
 
 
 class KeyValueDbProtocol(Protocol):
-    def get(self, keys: list[TimespanId]) -> dict[TimespanId, float]:
+    async def get(self, keys: list[TimespanId]) -> dict[TimespanId, float]:
         """
         Get values corresponding to keys of KeyValueDb.
 
@@ -20,7 +20,7 @@ class KeyValueDbProtocol(Protocol):
         """
         ...
 
-    def has(self, key: TimespanId) -> bool:
+    async def has(self, key: TimespanId) -> bool:
         """
         Checks if KeyValueDb has corresponding key.
 
@@ -31,7 +31,7 @@ class KeyValueDbProtocol(Protocol):
         """
         ...
 
-    def post(self, rains: list[RainStore]) -> None:
+    async def post(self, rains: list[RainStore]) -> None:
         """
         Post new rain values to backend key value db.
 
@@ -44,10 +44,12 @@ class KeyValueDbProtocol(Protocol):
 
 
 class DataFileProtocol(Protocol):
-    def get_last_data_date(self) -> date: ...
+    async def get_last_data_date(self) -> date: ...
 
     @contextmanager
-    def get_daily_file_path(self, begin_date: date) -> Generator[Path, None, None]: ...
+    async def get_daily_file_path(
+        self, begin_date: date
+    ) -> Generator[Path, None, None]: ...
 
     @contextmanager
-    def get_bulk_file_path(self) -> Generator[Path, None, None]: ...
+    async def get_bulk_file_path(self) -> Generator[Path, None, None]: ...

@@ -1,6 +1,6 @@
 import datetime as dt
 
-import requests as rq
+from aiohttp import ClientSession
 from cachetools import TTLCache, cached
 from fastapi import HTTPException
 
@@ -13,7 +13,7 @@ COMPUTE_DAILY_DATA_ROUTE = "commande-station/quotidienne"
 DOWNLOAD_ROUTE = "commande/fichier"
 
 
-def get_last_mfapi_data_date() -> dt.date:
+async def get_last_mfapi_data_date() -> dt.date:
     """
     Get latest data date available according to current time.
 
@@ -33,26 +33,30 @@ def get_last_mfapi_data_date() -> dt.date:
 
 
 @cached(cache=TTLCache(maxsize=1, ttl=3600))
-def get_mf_access_token() -> str:
+async def get_mf_access_token(session: ClientSession) -> str:
     """
     Get access token to authentify to Meteo France API.
 
     Tokens last one hour, and should be fetched through a Depends operation.
 
     Args:
-    - None
+    - session, ClientSession: aiohttp client session
     Returns:
     - str: token to use, valid one hour
     """
     data = {"grant_type": "client_credentials"}
     headers = {"Authorization": "Basic " + settings.mf_climate_app_id}
-    access_token_response = rq.post(
-        settings.mf_token_url, data=data, allow_redirects=False, headers=headers
-    )
-    return access_token_response.json()["access_token"]
+    async with session.post(
+        url=settings.mf_token_url, data=data, headers=headers, allow_redirects=False
+    ) as access_token_response:
+        payload = await access_token_response.json()
+        token = payload["access_token"]
+    return token
 
 
-def launch_daily_data_computation(begin_date: dt.date, token: str) -> str:
+async def launch_daily_data_computation(
+    session: ClientSession, begin_date: dt.date, token: str
+) -> str:
     """
     Launch daily data computation.
 
@@ -60,15 +64,16 @@ def launch_daily_data_computation(begin_date: dt.date, token: str) -> str:
     (this function) and only then a results fetch (following function).
 
     Args:
+    - session, ClientSession: aiohttp client session
     - begin_date, dt.date: date to begin computations from
     - token, str: token to identify this app
     Returns:
     - str: the id of the requested data computation
     """
     begin_time = begin_date.strftime("%Y-%m-%dT%H:%M:%SZ")
-    end_time = get_last_mfapi_data_date().strftime("%Y-%m-%dT%H:%M:%SZ")
+    end_time = (await get_last_mfapi_data_date()).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    launch_computation = rq.get(
+    async with session.get(
         url=f"{settings.mf_climate_app_url}/{COMPUTE_DAILY_DATA_ROUTE}",
         params={
             "id-station": ID_STATION,
@@ -76,31 +81,34 @@ def launch_daily_data_computation(begin_date: dt.date, token: str) -> str:
             "date-fin-periode": end_time,
         },
         headers={"Authorization": f"Bearer {token}"},
-    )
+    ) as launch_computation:
+        if (sc := launch_computation.status) // 100 > 2:
+            raise HTTPException(status_code=sc, detail=await launch_computation.text())
+        payload = await launch_computation.json()
 
-    if (sc := launch_computation.status_code) // 100 > 2:
-        raise HTTPException(status_code=sc, detail=launch_computation.text)
-
-    return launch_computation.json()["elaboreProduitAvecDemandeResponse"]["return"]
+    return payload["elaboreProduitAvecDemandeResponse"]["return"]
 
 
-def fetch_daily_data_computation_results(id_command: str, token: str) -> str:
+async def fetch_daily_data_computation_results(
+    session: ClientSession, id_command: str, token: str
+) -> str:
     """
     Fetch daily data computation results.
 
     Args:
+    - session, ClientSession: aiohttp client session
     - id_command, str: the id of the requested data computation
     - token, str: token to identify this app
     Returns:
     - str: result CSV file as string
     """
-    result_computation = rq.get(
+    async with session.get(
         url=f"{settings.mf_climate_app_url}/{DOWNLOAD_ROUTE}",
         params={"id-cmde": id_command},
         headers={"Authorization": f"Bearer {token}"},
-    )
+    ) as result_computation:
+        text = await result_computation.text()
+        if (sc := result_computation.status) // 100 > 2:
+            raise HTTPException(status_code=sc, detail=text)
 
-    if (sc := result_computation.status_code) // 100 > 2:
-        raise HTTPException(status_code=sc, detail=result_computation.text)
-
-    return result_computation.text
+    return text

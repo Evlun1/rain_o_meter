@@ -1,38 +1,26 @@
-from unittest.mock import Mock
-
 import pytest
 from fastapi import HTTPException
-from requests.models import Response
 
 from backend.meteofrance.data_gouv_service import get_bulk_file_content
 
 
-def test_get_bulk_file_content(mocker, settings):
+@pytest.mark.anyio
+async def test_get_bulk_file_content(mocker, settings, aiohttp_session, mock_responses):
     mocker.patch("backend.meteofrance.data_gouv_service.settings", settings)
     expected_content = bytes("testabcd", "utf8")
-    response = Mock(spec=Response)
-    response.status_code = 200
-    response.content = expected_content
-    get_patch = mocker.patch(
-        "backend.meteofrance.data_gouv_service.rq.get",
-        return_value=response,
-    )
+    mock_responses.get("www.dgfbulkdata.com", status=200, body=expected_content)
 
-    result = get_bulk_file_content()
+    result = await get_bulk_file_content(session=aiohttp_session)
 
-    get_patch.assert_called_once_with(url="www.dgfbulkdata.com")
     assert result == expected_content
 
 
-def test_get_bulk_file_content_raise_if_error(mocker, settings):
+@pytest.mark.anyio
+async def test_get_bulk_file_content_raise_if_error(
+    mocker, settings, aiohttp_session, mock_responses
+):
     mocker.patch("backend.meteofrance.data_gouv_service.settings", settings)
-    response = Mock(spec=Response)
-    response.status_code = 500
-    response.text = "Internal server error"
-    mocker.patch(
-        "backend.meteofrance.data_gouv_service.rq.get",
-        return_value=response,
-    )
+    mock_responses.get("www.dgfbulkdata.com", status=500, body="Internal server error")
 
     with pytest.raises(HTTPException):
-        get_bulk_file_content()
+        await get_bulk_file_content(session=aiohttp_session)

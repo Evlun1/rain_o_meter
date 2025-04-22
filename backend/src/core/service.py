@@ -15,7 +15,7 @@ from core.exceptions import AlreadyAddedData, AlreadyInitialized
 from core.protocol import DataFileProtocol, KeyValueDbProtocol
 
 
-def get_data(
+async def get_data(
     key_value_db_repo: KeyValueDbProtocol, last_data_day: date
 ) -> RainCompleteInfo:
     """
@@ -44,7 +44,7 @@ def get_data(
     mean_31_days_tsid: TimespanId = (
         f"M{prev_30_days.strftime('%m%d')}-M{last_data_day.strftime('%m%d')}"
     )
-    rain_data = key_value_db_repo.get(
+    rain_data = await key_value_db_repo.get(
         keys=[
             last_day_tsid,
             since_month_beg_tsid,
@@ -65,7 +65,9 @@ def get_data(
     )
 
 
-def _compute_daily_data(file_path: Path, this_day: date) -> tuple[float, float, float]:
+async def _compute_daily_data(
+    file_path: Path, this_day: date
+) -> tuple[float, float, float]:
     """
     Extracts all daily data : this day rain, this month rain and last 31 days rain.
 
@@ -102,7 +104,7 @@ def _compute_daily_data(file_path: Path, this_day: date) -> tuple[float, float, 
     return this_day_rain, this_month_rain, last_31_days_rain
 
 
-def fetch_daily_data_if_not_in_cache(
+async def fetch_daily_data_if_not_in_cache(
     key_value_db_repo: KeyValueDbProtocol,
     data_file_repo: DataFileProtocol,
     last_data_day: date,
@@ -122,7 +124,7 @@ def fetch_daily_data_if_not_in_cache(
     )
 
     # If daily data not in cache, compute it
-    if key_value_db_repo.has(last_day_tsid):
+    if await key_value_db_repo.has(last_day_tsid):
         raise AlreadyAddedData
 
     month_beg = date(last_data_day.year, last_data_day.month, 1)
@@ -137,7 +139,7 @@ def fetch_daily_data_if_not_in_cache(
     last_31_days_tsid: TimespanId = (
         f"{prev_30_days.strftime('%Y%m%d')}-{last_data_day.strftime('%Y%m%d')}"
     )
-    key_value_db_repo.post(
+    await key_value_db_repo.post(
         [
             RainStore(timespan_id=last_day_tsid, rain_mm=last_day_rain_mm),
             RainStore(timespan_id=since_month_beg_tsid, rain_mm=since_month_beg_mm),
@@ -146,7 +148,7 @@ def fetch_daily_data_if_not_in_cache(
     )
 
 
-def _preprocess_bulk_data(
+async def _preprocess_bulk_data(
     df: pl.DataFrame, begin_date: date, end_date: date
 ) -> pl.DataFrame:
     """
@@ -179,7 +181,7 @@ def _preprocess_bulk_data(
     return prep_df
 
 
-def _get_mean_data_between_two_mon_day_dates(
+async def _get_mean_data_between_two_mon_day_dates(
     df: pl.DataFrame,
     beg_mon: int,
     beg_day: int,
@@ -218,7 +220,7 @@ def _get_mean_data_between_two_mon_day_dates(
     return round(joined_df["rainfall_mm"].sum() / number_of_years, 1)
 
 
-def _compute_history_means(
+async def _compute_history_means(
     df: pl.DataFrame, this_day: date, number_of_years: int
 ) -> tuple[float, float]:
     """
@@ -260,7 +262,7 @@ def _compute_history_means(
     )
 
 
-def initialize_mean_data(
+async def initialize_mean_data(
     key_value_db_repo: KeyValueDbProtocol,
     data_file_repo: DataFileProtocol,
     year_beg_incl: int,
@@ -309,5 +311,5 @@ def initialize_mean_data(
     key_value_db_repo.post(rains=rain_means)
 
 
-def get_last_data_date(data_file_repo: DataFileProtocol) -> date:
+async def get_last_data_date(data_file_repo: DataFileProtocol) -> date:
     return data_file_repo.get_last_data_date()

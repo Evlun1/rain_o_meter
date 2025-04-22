@@ -1,10 +1,8 @@
 import datetime as dt
-from unittest.mock import Mock
 
 import pytest
 from fastapi import HTTPException
 from freezegun import freeze_time
-from requests.models import Response
 
 from backend.meteofrance.meteo_france_api_service import (
     fetch_daily_data_computation_results,
@@ -14,6 +12,7 @@ from backend.meteofrance.meteo_france_api_service import (
 )
 
 
+@pytest.mark.anyio
 @pytest.mark.parametrize(
     "test_date,expected",
     [
@@ -21,31 +20,26 @@ from backend.meteofrance.meteo_france_api_service import (
         ("2025-04-03 08:12:33", dt.date(2025, 4, 1)),
     ],
 )
-def test_get_last_mfapi_data_date(test_date, expected):
+async def test_get_last_mfapi_data_date(test_date, expected):
     with freeze_time(test_date):
-        assert get_last_mfapi_data_date() == expected
+        assert await get_last_mfapi_data_date() == expected
 
 
-def test_get_mf_access_token(mocker, settings):
+@pytest.mark.anyio
+async def test_get_mf_access_token(mocker, settings, aiohttp_session, mock_responses):
     expected = "toktok"
-    response = Mock(spec=Response)
-    response.json.return_value = {"access_token": expected}
-    post_patch = mocker.patch(
-        "backend.meteofrance.meteo_france_api_service.rq.post",
-        return_value=response,
-    )
     mocker.patch("backend.meteofrance.meteo_france_api_service.settings", settings)
-    result = get_mf_access_token()
-    post_patch.assert_called_once_with(
-        "www.testtoken.com",
-        data={"grant_type": "client_credentials"},
-        allow_redirects=False,
-        headers={"Authorization": "Basic 1234ab"},
+    mock_responses.post(
+        "www.testtoken.com", status=200, payload={"access_token": expected}
     )
+    result = await get_mf_access_token(session=aiohttp_session)
     assert result == expected
 
 
-def test_launch_daily_data_computation(mocker, settings):
+@pytest.mark.anyio
+async def test_launch_daily_data_computation(
+    mocker, settings, aiohttp_session, mock_responses
+):
     input_begin_date = dt.date(2025, 3, 15)
     mocked_end_date = dt.date(2025, 4, 1)
     input_token = "1234ab"
@@ -55,34 +49,24 @@ def test_launch_daily_data_computation(mocker, settings):
         return_value=mocked_end_date,
     )
     expected_id = "id5678"
-    response = Mock(spec=Response)
-    response.status_code = 200
-    response.json.return_value = {
-        "elaboreProduitAvecDemandeResponse": {"return": expected_id}
-    }
-    get_patch = mocker.patch(
-        "backend.meteofrance.meteo_france_api_service.rq.get",
-        return_value=response,
+    mock_responses.get(
+        "www.mfapp.com/commande-station/quotidienne?date-deb-periode=2025-03-15T00:00:00Z&date-fin-periode=2025-04-01T00:00:00Z&id-station=75114001",
+        status=200,
+        payload={"elaboreProduitAvecDemandeResponse": {"return": expected_id}},
     )
 
-    result = launch_daily_data_computation(
-        begin_date=input_begin_date, token=input_token
+    result = await launch_daily_data_computation(
+        session=aiohttp_session, begin_date=input_begin_date, token=input_token
     )
 
     last_date_patch.assert_called_once()
-    get_patch.assert_called_once_with(
-        url="www.mfapp.com/commande-station/quotidienne",
-        params={
-            "id-station": "75114001",
-            "date-deb-periode": "2025-03-15T00:00:00Z",
-            "date-fin-periode": "2025-04-01T00:00:00Z",
-        },
-        headers={"Authorization": "Bearer 1234ab"},
-    )
     assert result == expected_id
 
 
-def test_launch_daily_data_computation_raise_if_error(mocker, settings):
+@pytest.mark.anyio
+async def test_launch_daily_data_computation_raise_if_error(
+    mocker, settings, aiohttp_session, mock_responses
+):
     input_begin_date = dt.date(2025, 3, 15)
     mocked_end_date = dt.date(2025, 4, 1)
     input_token = "1234ab"
@@ -91,56 +75,53 @@ def test_launch_daily_data_computation_raise_if_error(mocker, settings):
         "backend.meteofrance.meteo_france_api_service.get_last_mfapi_data_date",
         return_value=mocked_end_date,
     )
-    response = Mock(spec=Response)
-    response.status_code = 500
-    response.text = "Internal server error"
-    mocker.patch(
-        "backend.meteofrance.meteo_france_api_service.rq.get",
-        return_value=response,
+    mock_responses.get(
+        "www.mfapp.com/commande-station/quotidienne?date-deb-periode=2025-03-15T00:00:00Z&date-fin-periode=2025-04-01T00:00:00Z&id-station=75114001",
+        status=500,
+        body="Internal server error",
     )
 
     with pytest.raises(HTTPException):
-        launch_daily_data_computation(begin_date=input_begin_date, token=input_token)
+        await launch_daily_data_computation(
+            session=aiohttp_session, begin_date=input_begin_date, token=input_token
+        )
 
 
-def test_fetch_daily_data_computation_results(mocker, settings):
+@pytest.mark.anyio
+async def test_fetch_daily_data_computation_results(
+    mocker, settings, aiohttp_session, mock_responses
+):
     input_id_command = "id5678"
     input_token = "1234ab"
     mocker.patch("backend.meteofrance.meteo_france_api_service.settings", settings)
     expected_content = "RR\n55"
-    response = Mock(spec=Response)
-    response.status_code = 200
-    response.text = expected_content
-    get_patch = mocker.patch(
-        "backend.meteofrance.meteo_france_api_service.rq.get",
-        return_value=response,
+    mock_responses.get(
+        url=f"www.mfapp.com/commande/fichier?id-cmde={input_id_command}",
+        status=200,
+        body=expected_content,
     )
 
-    result = fetch_daily_data_computation_results(
-        id_command=input_id_command, token=input_token
+    result = await fetch_daily_data_computation_results(
+        session=aiohttp_session, id_command=input_id_command, token=input_token
     )
 
-    get_patch.assert_called_once_with(
-        url="www.mfapp.com/commande/fichier",
-        params={"id-cmde": "id5678"},
-        headers={"Authorization": "Bearer 1234ab"},
-    )
     assert result == expected_content
 
 
-def test_fetch_daily_data_computation_results_raise_if_error(mocker, settings):
+@pytest.mark.anyio
+async def test_fetch_daily_data_computation_results_raise_if_error(
+    mocker, settings, aiohttp_session, mock_responses
+):
     input_id_command = "id5678"
     input_token = "1234ab"
     mocker.patch("backend.meteofrance.meteo_france_api_service.settings", settings)
-    response = Mock(spec=Response)
-    response.status_code = 500
-    response.text = "Internal server error"
-    mocker.patch(
-        "backend.meteofrance.meteo_france_api_service.rq.get",
-        return_value=response,
+    mock_responses.get(
+        url=f"www.mfapp.com/commande/fichier?id-cmde={input_id_command}",
+        status=500,
+        body="Internal server error",
     )
 
     with pytest.raises(HTTPException):
-        fetch_daily_data_computation_results(
-            id_command=input_id_command, token=input_token
+        await fetch_daily_data_computation_results(
+            session=aiohttp_session, id_command=input_id_command, token=input_token
         )

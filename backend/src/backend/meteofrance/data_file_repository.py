@@ -1,9 +1,10 @@
 import tempfile
-from contextlib import contextmanager
+from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
-from typing import Generator
+from typing import AsyncGenerator
 
+from aiohttp import ClientSession
 from fastapi.param_functions import Depends
 
 from backend.meteofrance.data_gouv_service import get_bulk_file_content
@@ -16,12 +17,16 @@ from backend.meteofrance.meteo_france_api_service import (
 
 
 class DataFileRepository:
-    mf_api_token: set
+    mf_api_token: str
+    session: ClientSession
 
-    def __init__(self, mf_api_token=Depends(get_mf_access_token)):
+    def __init__(
+        self, mf_api_token=Depends(get_mf_access_token), session=Depends(ClientSession)
+    ):
         self.mf_api_token = mf_api_token
+        self.session = session
 
-    def get_last_data_date(self) -> date:
+    async def get_last_data_date(self) -> date:
         """
         Get latest data date available according to current time.
 
@@ -30,15 +35,23 @@ class DataFileRepository:
         Returns:
         - date: last data date available on DataFile backend
         """
-        return get_last_mfapi_data_date()
+        return await get_last_mfapi_data_date()
 
-    @contextmanager
-    def get_daily_file_path(self, begin_date: date) -> Generator[Path, None, None]:
-        id_command = launch_daily_data_computation(
-            begin_date=begin_date, token=self.mf_api_token
+    @asynccontextmanager
+    async def get_daily_file_path(self, begin_date: date) -> AsyncGenerator[Path]:
+        """
+        Get daily data file and yield its path.
+
+        Args:
+        - begin_date, date : date to begin daily data fetch
+        Yields:
+        - Path: temporary path of daily data fetched file
+        """
+        id_command = await launch_daily_data_computation(
+            session=self.session, begin_date=begin_date, token=self.mf_api_token
         )
-        results = fetch_daily_data_computation_results(
-            id_command=id_command, token=self.mf_api_token
+        results = await fetch_daily_data_computation_results(
+            session=self.session, id_command=id_command, token=self.mf_api_token
         )
         with tempfile.TemporaryDirectory() as tmp_dir_name:
             daily_file_name = "daily_file.csv"
@@ -47,9 +60,17 @@ class DataFileRepository:
                 daily_file.write(results)
             yield daily_file_path
 
-    @contextmanager
-    def get_bulk_file_path(self) -> Generator[Path, None, None]:
-        content = get_bulk_file_content()
+    @asynccontextmanager
+    async def get_bulk_file_path(self) -> AsyncGenerator[Path]:
+        """
+        Get bulk data file and yield its path.
+
+        Args:
+        - None
+        Yields:
+        - Path: temporary path of bulk data fetched file
+        """
+        content = get_bulk_file_content(session=self.session)
         with tempfile.TemporaryDirectory() as tmp_dir_name:
             bulk_file_name = "bulk_file.csv.gz"
             bulk_file_path = Path(tmp_dir_name, bulk_file_name)
