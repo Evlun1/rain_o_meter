@@ -1,4 +1,5 @@
 import datetime as dt
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -6,8 +7,42 @@ from backend.meteofrance.data_file_repository import DataFileRepository
 
 
 @pytest.fixture
-def data_file_repository(aiohttp_session) -> DataFileRepository:
-    return DataFileRepository(mf_api_token="id1234", session=aiohttp_session)
+async def data_file_repository(mocker, aiohttp_session) -> DataFileRepository:
+    mocker.patch(
+        "backend.meteofrance.data_file_repository.get_mf_access_token",
+        return_value=aiohttp_session,
+    )
+    mocker.patch(
+        "backend.meteofrance.data_file_repository.get_mf_access_token",
+        return_value="id1234",
+        new_callable=AsyncMock,
+    )
+    dfr = DataFileRepository()
+    await dfr.lazy_init()
+    return dfr
+
+
+@pytest.mark.anyio
+async def test_lazy_init(mocker):
+    mocker.patch(
+        "backend.meteofrance.data_file_repository.get_mf_access_token",
+        return_value="to87",
+        new_callable=AsyncMock,
+    )
+    dfr = DataFileRepository()
+    assert dfr.session is None
+    assert dfr.mf_api_token is None
+    await dfr.lazy_init()
+    assert dfr.session is not None
+    assert dfr.mf_api_token == "to87"
+    mocker.patch(
+        "backend.meteofrance.data_file_repository.get_mf_access_token",
+        return_value="newto87",
+        new_callable=AsyncMock,
+    )
+    await dfr.lazy_init()
+    assert dfr.session is not None
+    assert dfr.mf_api_token == "to87"
 
 
 @pytest.mark.anyio

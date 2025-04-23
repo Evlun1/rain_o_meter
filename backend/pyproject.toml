@@ -48,7 +48,7 @@ addopts = [
 ]
 
 [tool.taskipy.tasks]
-dev = { cmd = "fastapi dev src/main.py", help = "runs fastapi dev server" }
+dev = { cmd = "fastapi dev api.py", help = "runs fastapi dev server" }
 test = { cmd = "pytest", help = "runs all tests" }
 format = { cmd = "ruff format", help = "formats code" }
 lint = { cmd = "ruff check --fix", help = "lints code" }

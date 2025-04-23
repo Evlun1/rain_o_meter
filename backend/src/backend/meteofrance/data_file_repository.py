@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
-from typing import AsyncGenerator
+from typing import Any, AsyncGenerator
 
 from aiohttp import ClientSession
 from anyio import TemporaryDirectory, open_file
@@ -10,6 +10,7 @@ from fastapi.param_functions import Depends
 from backend.meteofrance.data_gouv_service import get_bulk_file_content
 from backend.meteofrance.meteo_france_api_service import (
     fetch_daily_data_computation_results,
+    get_client_session,
     get_last_mfapi_data_date,
     get_mf_access_token,
     launch_daily_data_computation,
@@ -17,14 +18,17 @@ from backend.meteofrance.meteo_france_api_service import (
 
 
 class DataFileRepository:
-    mf_api_token: str
-    session: ClientSession
+    session: ClientSession | None = None
+    mf_api_token: str | None = None
 
-    def __init__(
-        self, mf_api_token=Depends(get_mf_access_token), session=Depends(ClientSession)
-    ):
-        self.mf_api_token = mf_api_token
-        self.session = session
+    async def lazy_init(self) -> None:
+        """
+        Init must be lazy as aiohttp.ClientSession() must be initialized in an event loop.
+        That's impossible in __init__ sync method called through Depends().
+        """
+        if self.session is None:
+            self.session = get_client_session()
+            self.mf_api_token = await get_mf_access_token(self.session)
 
     async def get_last_data_date(self) -> date:
         """
@@ -47,6 +51,7 @@ class DataFileRepository:
         Yields:
         - Path: temporary path of daily data fetched file
         """
+        await self.lazy_init()
         id_command = await launch_daily_data_computation(
             session=self.session, begin_date=begin_date, token=self.mf_api_token
         )
@@ -70,6 +75,7 @@ class DataFileRepository:
         Yields:
         - Path: temporary path of bulk data fetched file
         """
+        await self.lazy_init()
         content = await get_bulk_file_content(session=self.session)
         async with TemporaryDirectory() as tmp_dir_name:
             bulk_file_name = "bulk_file.csv.gz"

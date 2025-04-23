@@ -1,5 +1,5 @@
 import datetime as dt
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
 from unittest.mock import call
 
@@ -34,7 +34,8 @@ def key_value_db_repo(mock_module):
 
 
 class TestGetData:
-    def test_get_data(self, key_value_db_repo):
+    @pytest.mark.anyio
+    async def test_get_data(self, key_value_db_repo):
         input_last_data_date = dt.date(2025, 4, 15)
         key_value_db_repo.get.return_value = {
             "20250415-20250415": 0,
@@ -44,7 +45,7 @@ class TestGetData:
             "M0316-M0415": 50,
         }
 
-        result = get_data(
+        result = await get_data(
             key_value_db_repo=key_value_db_repo, last_data_day=input_last_data_date
         )
 
@@ -71,7 +72,8 @@ class TestGetData:
 
 
 class TestComputeDailyData:
-    def test_compute_daily_data(self):
+    @pytest.mark.anyio
+    async def test_compute_daily_data(self):
         input_file_path = Path(__file__).parent.joinpath(
             "resources", "input_compute_daily_data.csv"
         )
@@ -79,35 +81,39 @@ class TestComputeDailyData:
         expected_this_day = 5
         expected_this_month = 10.5
         expected_last_31_days = 14.5
-        result_this_day, result_this_month, result_last_31_days = _compute_daily_data(
-            input_file_path, input_this_day
+        result_this_day, result_this_month, result_last_31_days = (
+            await _compute_daily_data(input_file_path, input_this_day)
         )
         assert result_this_day == expected_this_day
         assert expected_this_month == result_this_month
         assert expected_last_31_days == result_last_31_days
 
-    def test_compute_daily_data_should_raise_validation_error(self):
+    @pytest.mark.anyio
+    async def test_compute_daily_data_should_raise_validation_error(self):
         input_file_path = Path(__file__).parent.joinpath(
             "resources", "input_compute_daily_data_wrong_format.csv"
         )
         input_this_day = dt.date(2025, 4, 2)
         with pytest.raises(SchemaError):
-            _compute_daily_data(input_file_path, input_this_day)
+            await _compute_daily_data(input_file_path, input_this_day)
 
 
 class TestFetchDailyDataIfNotInCache:
-    def test_fetch_daily_data_not_in_cache(self, data_file_repo, key_value_db_repo):
+    @pytest.mark.anyio
+    async def test_fetch_daily_data_not_in_cache(
+        self, data_file_repo, key_value_db_repo
+    ):
         input_last_data_day = dt.date(2025, 4, 2)
         key_value_db_repo.has.return_value = False
 
-        @contextmanager
-        def mock_daily_file_path(begin_date):
+        @asynccontextmanager
+        async def mock_daily_file_path(begin_date):
             yield Path(__file__).parent.joinpath(
                 "resources", "input_compute_daily_data.csv"
             )
 
         data_file_repo.get_daily_file_path = mock_daily_file_path
-        fetch_daily_data_if_not_in_cache(
+        await fetch_daily_data_if_not_in_cache(
             key_value_db_repo, data_file_repo, input_last_data_day
         )
         key_value_db_repo.post.assert_called_once_with(
@@ -118,17 +124,21 @@ class TestFetchDailyDataIfNotInCache:
             ]
         )
 
-    def test_fetch_daily_data_already_in_cache(self, data_file_repo, key_value_db_repo):
+    @pytest.mark.anyio
+    async def test_fetch_daily_data_already_in_cache(
+        self, data_file_repo, key_value_db_repo
+    ):
         input_last_data_day = dt.date(2025, 4, 2)
         key_value_db_repo.has.return_value = True
         with pytest.raises(AlreadyAddedData):
-            fetch_daily_data_if_not_in_cache(
+            await fetch_daily_data_if_not_in_cache(
                 key_value_db_repo, data_file_repo, input_last_data_day
             )
 
 
 class TestPreprocessBulkData:
-    def test_preprocess_bulk_data(self, mocker):
+    @pytest.mark.anyio
+    async def test_preprocess_bulk_data(self, mocker):
         input_df = pl.DataFrame(
             data={
                 "station_id": [1, 1, 1, 2],
@@ -154,12 +164,13 @@ class TestPreprocessBulkData:
             },
         )
         mocker.patch("core.service.STATION_ID", 1)
-        result = _preprocess_bulk_data(input_df, input_begin_date, input_end_date)
+        result = await _preprocess_bulk_data(input_df, input_begin_date, input_end_date)
         assert_frame_equal(result, expected_df)
 
 
 class TestGetMeanDataBetweenTwoMonDayDates:
-    def test_get_mean_data_between_two_mon_day_dates_normal_case(self):
+    @pytest.mark.anyio
+    async def test_get_mean_data_between_two_mon_day_dates_normal_case(self):
         input_beg_mon = 3
         input_beg_day = 30
         input_end_mon = 4
@@ -183,7 +194,7 @@ class TestGetMeanDataBetweenTwoMonDayDates:
             }
         )
         expected_mean = 10.5
-        result = _get_mean_data_between_two_mon_day_dates(
+        result = await _get_mean_data_between_two_mon_day_dates(
             input_df,
             input_beg_mon,
             input_beg_day,
@@ -193,7 +204,8 @@ class TestGetMeanDataBetweenTwoMonDayDates:
         )
         assert result == expected_mean
 
-    def test_get_mean_data_between_two_mon_day_dates_between_years(self):
+    @pytest.mark.anyio
+    async def test_get_mean_data_between_two_mon_day_dates_between_years(self):
         input_beg_mon = 12
         input_beg_day = 31
         input_end_mon = 1
@@ -217,7 +229,7 @@ class TestGetMeanDataBetweenTwoMonDayDates:
             }
         )
         expected_mean = 10.5
-        result = _get_mean_data_between_two_mon_day_dates(
+        result = await _get_mean_data_between_two_mon_day_dates(
             input_df,
             input_beg_mon,
             input_beg_day,
@@ -229,7 +241,8 @@ class TestGetMeanDataBetweenTwoMonDayDates:
 
 
 class TestComputeHistoryMeans:
-    def test_compute_history_means(self):
+    @pytest.mark.anyio
+    async def test_compute_history_means(self):
         input_df = pl.DataFrame(
             data={
                 "date": [
@@ -249,7 +262,7 @@ class TestComputeHistoryMeans:
         )
         input_this_day = dt.date(2000, 4, 2)
         input_number_of_years = 2
-        result_rain_1, result_rain_2 = _compute_history_means(
+        result_rain_1, result_rain_2 = await _compute_history_means(
             input_df, input_this_day, input_number_of_years
         )
         expected_rain_1 = RainStore(timespan_id="M0401-M0402", rain_mm=8)
@@ -259,16 +272,15 @@ class TestComputeHistoryMeans:
 
 
 class TestInitializeMeanData:
-    def test_initialize_mean_data(self, mocker, data_file_repo, key_value_db_repo):
+    @pytest.mark.anyio
+    async def test_initialize_mean_data(self, mocker, data_file_repo, key_value_db_repo):
         input_year_beg_incl = 2020
         input_year_end_incl = 2020
         key_value_db_repo.has.return_value = False
 
-        @contextmanager
-        def mock_get_bulk_file_path():
-            yield Path(__file__).parent.joinpath(
-                "resources", "input_init_mean_data.csv"
-            )
+        @asynccontextmanager
+        async def mock_get_bulk_file_path():
+            yield Path(__file__).parent.joinpath("resources", "input_init_mean_data.csv")
 
         data_file_repo.get_bulk_file_path = mock_get_bulk_file_path
         mocker.patch("core.service.STATION_ID", 75000001)
@@ -276,7 +288,7 @@ class TestInitializeMeanData:
             "core.service._compute_history_means", return_value=(5, 5)
         )
 
-        initialize_mean_data(
+        await initialize_mean_data(
             key_value_db_repo, data_file_repo, input_year_beg_incl, input_year_end_incl
         )
 
@@ -286,7 +298,8 @@ class TestInitializeMeanData:
         assert compute_history_patch.call_count == 366
         key_value_db_repo.post.assert_called_once_with(rains=[5] * 732)
 
-    def test_initialize_mean_data_raise_if_already_init(
+    @pytest.mark.anyio
+    async def test_initialize_mean_data_raise_if_already_init(
         self, data_file_repo, key_value_db_repo
     ):
         input_year_beg_incl = 2020
@@ -294,7 +307,7 @@ class TestInitializeMeanData:
         key_value_db_repo.has.return_value = True
 
         with pytest.raises(AlreadyInitialized):
-            initialize_mean_data(
+            await initialize_mean_data(
                 key_value_db_repo,
                 data_file_repo,
                 input_year_beg_incl,
@@ -303,8 +316,9 @@ class TestInitializeMeanData:
 
 
 class TestGetLastDataDate:
-    def test_get_last_data_date(self, data_file_repo):
+    @pytest.mark.anyio
+    async def test_get_last_data_date(self, data_file_repo):
         data_file_repo.get_last_data_date.return_value = dt.date(2025, 4, 1)
-        result = get_last_data_date(data_file_repo)
+        result = await get_last_data_date(data_file_repo)
         data_file_repo.get_last_data_date.assert_called_once()
         assert result == dt.date(2025, 4, 1)

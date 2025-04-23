@@ -4,7 +4,7 @@ from fastapi import FastAPI, Response
 from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.param_functions import Depends
-from fastapi.responses import JSONResponse  # type: ignore
+from fastapi.responses import JSONResponse
 from mangum import Mangum
 
 import core.service as core_service
@@ -46,22 +46,20 @@ class AlreadyInitializedHTTPException(HTTPException):
 class AlreadyAddedDataHTTPException(HTTPException):
     """Exception raised when the data is already added to backed."""
 
-    def __init__(
-        self, status_code=409, detail="Daily data already added", headers=None
-    ):
+    def __init__(self, status_code=409, detail="Daily data already added", headers=None):
         super().__init__(status_code, detail, headers)
 
 
 async def get_last_data_day(
     data_file_repo: DataFileProtocol = Depends(DataFileRepository),
 ) -> date:
-    return core_service.get_last_data_date(data_file_repo)
+    return await core_service.get_last_data_date(data_file_repo)
 
 
 @app.get(
     "/",
     response_class=JSONResponse,
-    response_model=RainCompleteInfo,
+    response_model=None,
     description="Get all mandatory data to display in front.",
     status_code=200,  # OK
     responses={
@@ -72,13 +70,13 @@ async def get(
     key_value_db_repo: KeyValueDbProtocol = Depends(KeyValueDbRepository),
     last_data_day: date = Depends(get_last_data_day),
 ) -> RainCompleteInfo:
-    return core_service.get_data(key_value_db_repo, last_data_day)
+    return await core_service.get_data(key_value_db_repo, last_data_day)
 
 
 @app.get(
     "/add",
     response_class=JSONResponse,
-    response_model=RainCompleteInfo,
+    response_model=None,
     description="Add daily data in backend if needed.",
     status_code=201,  # Created
     responses={
@@ -92,7 +90,7 @@ async def add(
     last_data_day: date = Depends(get_last_data_day),
 ):
     try:
-        core_service.fetch_daily_data_if_not_in_cache(
+        await core_service.fetch_daily_data_if_not_in_cache(
             key_value_db_repo, data_file_repo, last_data_day
         )
     except AlreadyAddedData as exc:
@@ -103,7 +101,7 @@ async def add(
 @app.get(
     "/initialize",
     response_class=JSONResponse,
-    response_model=RainCompleteInfo,
+    response_model=None,
     description="Initialize backend data.",
     status_code=201,  # Created
     responses={
@@ -116,7 +114,7 @@ async def initialize(
     data_file_repo: DataFileProtocol = Depends(DataFileRepository),
 ):
     try:
-        core_service.initialize_mean_data(
+        await core_service.initialize_mean_data(
             key_value_db_repo,
             data_file_repo,
             settings.year_beg_incl,

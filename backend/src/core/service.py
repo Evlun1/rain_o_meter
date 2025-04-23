@@ -129,9 +129,11 @@ async def fetch_daily_data_if_not_in_cache(
 
     month_beg = date(last_data_day.year, last_data_day.month, 1)
     prev_30_days = last_data_day - timedelta(days=30)
-    with data_file_repo.get_daily_file_path(begin_date=prev_30_days) as daily_file_path:
-        last_day_rain_mm, since_month_beg_mm, last_31_days_mm = _compute_daily_data(
-            daily_file_path, last_data_day
+    async with data_file_repo.get_daily_file_path(
+        begin_date=prev_30_days
+    ) as daily_file_path:
+        last_day_rain_mm, since_month_beg_mm, last_31_days_mm = (
+            await _compute_daily_data(daily_file_path, last_data_day)
         )
     since_month_beg_tsid: TimespanId = (
         f"{month_beg.strftime('%Y%m%d')}-{last_data_day.strftime('%Y%m%d')}"
@@ -246,12 +248,12 @@ async def _compute_history_means(
     )
     return RainStore(
         timespan_id=mean_month_beg_tsid,
-        rain_mm=_get_mean_data_between_two_mon_day_dates(
+        rain_mm=await _get_mean_data_between_two_mon_day_dates(
             df, this_day.month, 1, this_day.month, this_day.day, number_of_years
         ),
     ), RainStore(
         timespan_id=mean_30_days_tsid,
-        rain_mm=_get_mean_data_between_two_mon_day_dates(
+        rain_mm=await _get_mean_data_between_two_mon_day_dates(
             df,
             prev_30_days.month,
             prev_30_days.day,
@@ -280,13 +282,13 @@ async def initialize_mean_data(
     - none
     """
     beginning_tsid: TimespanId = "M0101-M0101"
-    if key_value_db_repo.has(beginning_tsid):
+    if await key_value_db_repo.has(beginning_tsid):
         raise AlreadyInitialized
 
     begin_date = date(year_beg_incl, 1, 1)
     end_date = date(year_end_incl, 12, 31)
 
-    with data_file_repo.get_bulk_file_path() as bulk_file_path:
+    async with data_file_repo.get_bulk_file_path() as bulk_file_path:
         bulk_file_df = pl.read_csv(
             bulk_file_path,
             has_header=True,
@@ -295,7 +297,7 @@ async def initialize_mean_data(
             separator=";",
         )
     BulkFileSchema.validate(bulk_file_df)
-    prep_df = _preprocess_bulk_data(bulk_file_df, begin_date, end_date)
+    prep_df = await _preprocess_bulk_data(bulk_file_df, begin_date, end_date)
 
     rain_means: list[RainStore] = []
     number_of_years = 1 + (prep_df["date"].max().year - prep_df["date"].min().year)
@@ -303,13 +305,13 @@ async def initialize_mean_data(
     for day in pl.date_range(
         date(2000, 1, 1), date(2000, 12, 31), "1d", eager=True
     ).to_list():
-        mean_beg_month, mean_last_31_days = _compute_history_means(
+        mean_beg_month, mean_last_31_days = await _compute_history_means(
             prep_df, rain_means, day, number_of_years
         )
         rain_means.extend([mean_beg_month, mean_last_31_days])
 
-    key_value_db_repo.post(rains=rain_means)
+    await key_value_db_repo.post(rains=rain_means)
 
 
 async def get_last_data_date(data_file_repo: DataFileProtocol) -> date:
-    return data_file_repo.get_last_data_date()
+    return await data_file_repo.get_last_data_date()

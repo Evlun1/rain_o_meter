@@ -1,4 +1,5 @@
 import datetime as dt
+from functools import partial
 
 from aiohttp import ClientSession
 from cachetools import TTLCache, cached
@@ -30,6 +31,11 @@ async def get_last_mfapi_data_date() -> dt.date:
     now = dt.datetime.now(dt.timezone.utc)
     delta_days = 2 if now.time() < dt.time(11, 35, 00) else 1
     return now.date() - dt.timedelta(days=delta_days)
+
+
+@cached(cache=TTLCache(maxsize=1, ttl=3600))
+def get_client_session():
+    return ClientSession()
 
 
 @cached(cache=TTLCache(maxsize=1, ttl=3600))

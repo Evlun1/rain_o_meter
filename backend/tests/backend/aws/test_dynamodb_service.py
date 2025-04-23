@@ -33,10 +33,13 @@ async def test_get_items(event_loop, mocker, settings, dynamodb_client):
     keys = ["key1", "key4"]
     result = await get_items(dynamodb_client, keys)
     assert result == [1, 4]
+    await dynamodb_client.delete_table(TableName=settings.backend_table_name)
 
 
 @pytest.mark.anyio
-async def test_write_items(event_loop, mocker, settings, dynamodb_resource):
+async def test_write_items(
+    event_loop, mocker, settings, dynamodb_resource, dynamodb_client
+):
     mocker.patch("backend.aws.dynamodb_service.settings", settings)
     await dynamodb_resource.create_table(
         TableName=settings.backend_table_name,
@@ -54,6 +57,7 @@ async def test_write_items(event_loop, mocker, settings, dynamodb_resource):
     table = await dynamodb_resource.Table(settings.backend_table_name)
     response = await table.get_item(Key={settings.backend_table_key_name: "key1"})
     assert response["Item"][settings.backend_table_value_name] == "1"
+    await dynamodb_client.delete_table(TableName=settings.backend_table_name)
 
 
 @pytest.mark.anyio
@@ -79,3 +83,4 @@ async def test_has_item(event_loop, mocker, settings, dynamodb_client):
 
     assert await has_item(dynamodb_client, "key1") is True
     assert await has_item(dynamodb_client, "key2") is False
+    await dynamodb_client.delete_table(TableName=settings.backend_table_name)
