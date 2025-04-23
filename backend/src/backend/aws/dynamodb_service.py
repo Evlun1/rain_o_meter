@@ -1,6 +1,6 @@
 from functools import cache
 
-import boto3
+from aioboto3 import Session
 from mypy_boto3_dynamodb import DynamoDBClient, DynamoDBServiceResource
 from mypy_boto3_dynamodb.type_defs import (
     BatchGetItemInputTypeDef,
@@ -14,16 +14,11 @@ settings = get_api_settings()
 
 
 @cache
-def get_aws_client() -> DynamoDBClient:
-    return boto3.client("dynamodb")
+def get_aws_session() -> Session:
+    return Session()
 
 
-@cache
-def get_aws_resource() -> DynamoDBServiceResource:
-    return boto3.resource("dynamodb")
-
-
-def get_items(ddb_client: DynamoDBClient, keys: list[str]) -> list[float]:
+async def get_items(ddb_client: DynamoDBClient, keys: list[str]) -> list[float]:
     """
     Get rain items from DDB.
 
@@ -31,7 +26,7 @@ def get_items(ddb_client: DynamoDBClient, keys: list[str]) -> list[float]:
     an expected use case.
 
     Args:
-    - ddb_client, DynamoDbClient: boto client
+    - ddb_client, DynamoDBClient: aioboto3 dynamodb client
     - keys, list[str] : list of keys to request table
     Returns:
     - list[float] : list of rain amounts for given timestamps
@@ -41,7 +36,7 @@ def get_items(ddb_client: DynamoDBClient, keys: list[str]) -> list[float]:
             "Keys": [{settings.backend_table_key_name: {"S": k}} for k in keys]
         }
     }
-    raw_result: BatchGetItemOutputTypeDef = ddb_client.batch_get_item(
+    raw_result: BatchGetItemOutputTypeDef = await ddb_client.batch_get_item(
         RequestItems=request_items
     )
     return [
@@ -50,20 +45,22 @@ def get_items(ddb_client: DynamoDBClient, keys: list[str]) -> list[float]:
     ]
 
 
-def write_items(ddb_resource: DynamoDBServiceResource, items: dict[str, float]) -> None:
+async def write_items(
+    ddb_resource: DynamoDBServiceResource, items: dict[str, float]
+) -> None:
     """
     Write given items in DDB table.
 
     Args:
-    - ddb_resource, DynamoDBServiceResource: boto resource
+    - ddb_resource, DynamoDBServiceResource: aioboto3 dynamodb resource
     - items, dict[str, float] : key-value data to store
     Returns:
     - None
     """
-    ddb_table = ddb_resource.Table(settings.backend_table_name)
-    with ddb_table.batch_writer() as writer:
+    ddb_table = await ddb_resource.Table(settings.backend_table_name)
+    async with ddb_table.batch_writer() as writer:
         for k, v in items.items():
-            writer.put_item(
+            await writer.put_item(
                 Item={
                     settings.backend_table_key_name: k,
                     settings.backend_table_value_name: str(v),
@@ -71,17 +68,17 @@ def write_items(ddb_resource: DynamoDBServiceResource, items: dict[str, float]) 
             )
 
 
-def has_item(ddb_client: DynamoDBClient, key: str) -> bool:
+async def has_item(ddb_client: DynamoDBClient, key: str) -> bool:
     """
     Checks if given key is in backend table.
 
     Args:
-    - ddb_client, DynamoDBClient: boto client
+    - ddb_client, DynamoDBClient: aioboto3 dynamodb client
     - key, str: key to check existence
     Returns:
     - bool: is the key in backend table
     """
-    response: GetItemOutputTypeDef = ddb_client.get_item(
+    response: GetItemOutputTypeDef = await ddb_client.get_item(
         TableName=settings.backend_table_name,
         Key={settings.backend_table_key_name: {"S": key}},
     )

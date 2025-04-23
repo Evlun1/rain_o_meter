@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import AsyncGenerator
 
 from aiohttp import ClientSession
-from anyio import open_file, TemporaryDirectory
+from anyio import TemporaryDirectory, open_file
 from fastapi.param_functions import Depends
 
 from backend.meteofrance.data_gouv_service import get_bulk_file_content

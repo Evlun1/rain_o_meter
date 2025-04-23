@@ -1,4 +1,4 @@
-from mypy_boto3_dynamodb import DynamoDBClient, DynamoDBServiceResource
+import pytest
 
 from backend.aws.dynamodb_service import (
     get_items,
@@ -7,10 +7,11 @@ from backend.aws.dynamodb_service import (
 )
 
 
-def test_get_items(mocker, ddb_client: DynamoDBClient, settings):
+@pytest.mark.anyio
+async def test_get_items(event_loop, mocker, settings, dynamodb_client):
     # Setup mock data
     mocker.patch("backend.aws.dynamodb_service.settings", settings)
-    ddb_client.create_table(
+    await dynamodb_client.create_table(
         TableName=settings.backend_table_name,
         KeySchema=[
             {"AttributeName": settings.backend_table_key_name, "KeyType": "HASH"}
@@ -21,7 +22,7 @@ def test_get_items(mocker, ddb_client: DynamoDBClient, settings):
         ProvisionedThroughput={"ReadCapacityUnits": 1, "WriteCapacityUnits": 1},
     )
     for k in range(5):
-        ddb_client.put_item(
+        await dynamodb_client.put_item(
             TableName=settings.backend_table_name,
             Item={
                 settings.backend_table_key_name: {"S": f"key{str(k)}"},
@@ -30,13 +31,14 @@ def test_get_items(mocker, ddb_client: DynamoDBClient, settings):
         )
 
     keys = ["key1", "key4"]
-    result = get_items(ddb_client, keys)
+    result = await get_items(dynamodb_client, keys)
     assert result == [1, 4]
 
 
-def test_write_items(ddb_resource: DynamoDBServiceResource, mocker, settings):
+@pytest.mark.anyio
+async def test_write_items(event_loop, mocker, settings, dynamodb_resource):
     mocker.patch("backend.aws.dynamodb_service.settings", settings)
-    ddb_resource.create_table(
+    await dynamodb_resource.create_table(
         TableName=settings.backend_table_name,
         KeySchema=[
             {"AttributeName": settings.backend_table_key_name, "KeyType": "HASH"}
@@ -47,16 +49,17 @@ def test_write_items(ddb_resource: DynamoDBServiceResource, mocker, settings):
         ProvisionedThroughput={"ReadCapacityUnits": 1, "WriteCapacityUnits": 1},
     )
     items = {"key1": 1, "key2": 2}
-    write_items(ddb_resource, items)
+    await write_items(dynamodb_resource, items)
 
-    table = ddb_resource.Table(settings.backend_table_name)
-    response = table.get_item(Key={settings.backend_table_key_name: "key1"})
+    table = await dynamodb_resource.Table(settings.backend_table_name)
+    response = await table.get_item(Key={settings.backend_table_key_name: "key1"})
     assert response["Item"][settings.backend_table_value_name] == "1"
 
 
-def test_has_item(ddb_client: DynamoDBClient, mocker, settings):
+@pytest.mark.anyio
+async def test_has_item(event_loop, mocker, settings, dynamodb_client):
     mocker.patch("backend.aws.dynamodb_service.settings", settings)
-    ddb_client.create_table(
+    await dynamodb_client.create_table(
         TableName=settings.backend_table_name,
         KeySchema=[
             {"AttributeName": settings.backend_table_key_name, "KeyType": "HASH"}
@@ -66,7 +69,7 @@ def test_has_item(ddb_client: DynamoDBClient, mocker, settings):
         ],
         ProvisionedThroughput={"ReadCapacityUnits": 1, "WriteCapacityUnits": 1},
     )
-    ddb_client.put_item(
+    await dynamodb_client.put_item(
         TableName=settings.backend_table_name,
         Item={
             settings.backend_table_key_name: {"S": "key1"},
@@ -74,5 +77,5 @@ def test_has_item(ddb_client: DynamoDBClient, mocker, settings):
         },
     )
 
-    assert has_item(ddb_client, "key1") is True
-    assert has_item(ddb_client, "key2") is False
+    assert await has_item(dynamodb_client, "key1") is True
+    assert await has_item(dynamodb_client, "key2") is False
