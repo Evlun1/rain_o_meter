@@ -1,3 +1,4 @@
+from copy import deepcopy
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -132,9 +133,11 @@ async def fetch_daily_data_if_not_in_cache(
     async with data_file_repo.get_daily_file_path(
         begin_date=prev_30_days
     ) as daily_file_path:
-        last_day_rain_mm, since_month_beg_mm, last_31_days_mm = (
-            await _compute_daily_data(daily_file_path, last_data_day)
-        )
+        (
+            last_day_rain_mm,
+            since_month_beg_mm,
+            last_31_days_mm,
+        ) = await _compute_daily_data(daily_file_path, last_data_day)
     since_month_beg_tsid: TimespanId = (
         f"{month_beg.strftime('%Y%m%d')}-{last_data_day.strftime('%Y%m%d')}"
     )
@@ -246,22 +249,52 @@ async def _compute_history_means(
     mean_30_days_tsid: TimespanId = (
         f"M{prev_30_days.strftime('%m%d')}-M{this_day.strftime('%m%d')}"
     )
-    return RainStore(
-        timespan_id=mean_month_beg_tsid,
-        rain_mm=await _get_mean_data_between_two_mon_day_dates(
-            df, this_day.month, 1, this_day.month, this_day.day, number_of_years
+    means = [
+        RainStore(
+            timespan_id=mean_month_beg_tsid,
+            rain_mm=await _get_mean_data_between_two_mon_day_dates(
+                df, this_day.month, 1, this_day.month, this_day.day, number_of_years
+            ),
         ),
-    ), RainStore(
-        timespan_id=mean_30_days_tsid,
-        rain_mm=await _get_mean_data_between_two_mon_day_dates(
-            df,
-            prev_30_days.month,
-            prev_30_days.day,
-            this_day.month,
-            this_day.day,
-            number_of_years,
+        RainStore(
+            timespan_id=mean_30_days_tsid,
+            rain_mm=await _get_mean_data_between_two_mon_day_dates(
+                df,
+                prev_30_days.month,
+                prev_30_days.day,
+                this_day.month,
+                this_day.day,
+                number_of_years,
+            ),
         ),
-    )
+    ]
+
+    # Handle leap year case messing "30 previous days" rolling period
+    this_year = this_day.year
+    if (
+        (this_year % 4 == 0 and this_year % 100 != 0) or (this_year % 400 == 0)
+    ) and (  # leap year
+        prev_30_days <= date(this_year, 2, 29) < this_day
+    ):
+        prev_31_days = prev_30_days - timedelta(days=1)
+        mean_31_days_tsid: TimespanId = (
+            f"M{prev_31_days.strftime('%m%d')}-M{this_day.strftime('%m%d')}"
+        )
+        means.append(
+            RainStore(
+                timespan_id=mean_31_days_tsid,
+                rain_mm=await _get_mean_data_between_two_mon_day_dates(
+                    df,
+                    prev_31_days.month,
+                    prev_31_days.day,
+                    this_day.month,
+                    this_day.day,
+                    number_of_years,
+                ),
+            )
+        )
+
+    return means
 
 
 async def initialize_mean_data(
@@ -305,10 +338,8 @@ async def initialize_mean_data(
     for day in pl.date_range(
         date(2000, 1, 1), date(2000, 12, 31), "1d", eager=True
     ).to_list():
-        mean_beg_month, mean_last_31_days = await _compute_history_means(
-            prep_df, rain_means, day, number_of_years
-        )
-        rain_means.extend([mean_beg_month, mean_last_31_days])
+        day_means = await _compute_history_means(prep_df, day, number_of_years)
+        rain_means.extend(deepcopy(day_means))  # need deepcopy because of pydantic obj
 
     await key_value_db_repo.post(rains=rain_means)
 

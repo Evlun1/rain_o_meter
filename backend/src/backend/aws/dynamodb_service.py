@@ -63,7 +63,7 @@ async def write_items(
             await writer.put_item(
                 Item={
                     settings.backend_table_key_name: k,
-                    settings.backend_table_value_name: str(v),
+                    settings.backend_table_value_name: v,
                 }
             )
 

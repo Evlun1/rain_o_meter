@@ -46,7 +46,9 @@ class AlreadyInitializedHTTPException(HTTPException):
 class AlreadyAddedDataHTTPException(HTTPException):
     """Exception raised when the data is already added to backed."""
 
-    def __init__(self, status_code=409, detail="Daily data already added", headers=None):
+    def __init__(
+        self, status_code=409, detail="Daily data already added", headers=None
+    ):
         super().__init__(status_code, detail, headers)
 
 

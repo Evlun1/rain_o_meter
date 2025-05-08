@@ -26,6 +26,16 @@ async def test_get_last_mfapi_data_date(test_date, expected):
 
 
 @pytest.mark.anyio
+async def test_get_last_mfapi_fake_data_date(mocker, settings_with_fake_date):
+    mocker.patch(
+        "backend.meteofrance.meteo_france_api_service.settings", settings_with_fake_date
+    )
+    result = await get_last_mfapi_data_date()
+    expected = dt.date(2025, 4, 1)
+    assert result == expected
+
+
+@pytest.mark.anyio
 async def test_get_mf_access_token(mocker, settings, aiohttp_session, mock_responses):
     expected = "toktok"
     mocker.patch("backend.meteofrance.meteo_france_api_service.settings", settings)

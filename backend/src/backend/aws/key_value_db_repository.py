@@ -10,6 +10,9 @@ from backend.aws.dynamodb_service import (
     write_items,
 )
 from core.entities import RainStore, TimespanId
+from settings import get_api_settings
+
+settings = get_api_settings()
 
 
 class KeyValueDbRepository:
@@ -20,6 +23,9 @@ class KeyValueDbRepository:
         session: Session = Depends(get_aws_session),
     ) -> Self:
         self.session = session
+        self.endpoint_url = (
+            {"endpoint_url": settings.aws_endpoint} if settings.aws_endpoint else {}
+        )
 
     async def get(self, keys: list[TimespanId]) -> dict[TimespanId, float]:
         """
@@ -32,7 +38,7 @@ class KeyValueDbRepository:
         Returns:
         - dict[TimespanId, float]: dict with input keys & corresponding values
         """
-        async with self.session.client("dynamodb") as ddb_client:
+        async with self.session.client("dynamodb", **self.endpoint_url) as ddb_client:
             values = await get_items(ddb_client=ddb_client, keys=keys)
         return {ts_id: rain_mm for ts_id, rain_mm in zip(keys, values)}
 
@@ -45,7 +51,7 @@ class KeyValueDbRepository:
         Returns:
         - bool: is the key in Db
         """
-        async with self.session.client("dynamodb") as ddb_client:
+        async with self.session.client("dynamodb", **self.endpoint_url) as ddb_client:
             result = await has_item(ddb_client=ddb_client, key=key)
         return result
 
@@ -58,7 +64,9 @@ class KeyValueDbRepository:
         Returns:
         - None
         """
-        async with self.session.resource("dynamodb") as ddb_resource:
+        async with self.session.resource(
+            "dynamodb", **self.endpoint_url
+        ) as ddb_resource:
             rain_items = {rain.timespan_id: rain.rain_mm for rain in rains}
             await write_items(ddb_resource=ddb_resource, items=rain_items)
         return None

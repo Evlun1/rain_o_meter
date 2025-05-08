@@ -1,5 +1,5 @@
 import datetime as dt
-from contextlib import asynccontextmanager, contextmanager
+from contextlib import asynccontextmanager
 from pathlib import Path
 from unittest.mock import call
 
@@ -81,9 +81,11 @@ class TestComputeDailyData:
         expected_this_day = 5
         expected_this_month = 10.5
         expected_last_31_days = 14.5
-        result_this_day, result_this_month, result_last_31_days = (
-            await _compute_daily_data(input_file_path, input_this_day)
-        )
+        (
+            result_this_day,
+            result_this_month,
+            result_last_31_days,
+        ) = await _compute_daily_data(input_file_path, input_this_day)
         assert result_this_day == expected_this_day
         assert expected_this_month == result_this_month
         assert expected_last_31_days == result_last_31_days
@@ -270,6 +272,37 @@ class TestComputeHistoryMeans:
         assert result_rain_1 == expected_rain_1
         assert result_rain_2 == expected_rain_2
 
+    @pytest.mark.anyio
+    async def test_compute_history_means_leap_year_case(self):
+        input_df = pl.DataFrame(
+            data={
+                "date": [
+                    dt.date(2024, 2, 28),
+                    dt.date(2024, 2, 29),
+                    dt.date(2024, 3, 1),
+                    dt.date(2024, 3, 2),
+                    dt.date(2025, 2, 28),
+                    dt.date(2025, 3, 1),
+                    dt.date(2025, 3, 2),
+                    dt.date(2025, 3, 3),
+                ],
+                "rainfall_mm": [0.5, 1, 2, 3, 4, 5, 6, 7],
+                "month": [2, 2, 3, 3, 2, 3, 3, 3],
+                "day": [28, 29, 1, 2, 28, 1, 2, 3],
+            }
+        )
+        input_this_day = dt.date(2000, 3, 2)
+        input_number_of_years = 2
+        results = await _compute_history_means(
+            input_df, input_this_day, input_number_of_years
+        )
+        expected = [
+            RainStore(timespan_id="M0301-M0302", rain_mm=8),
+            RainStore(timespan_id="M0201-M0302", rain_mm=10.8),
+            RainStore(timespan_id="M0131-M0302", rain_mm=10.8),
+        ]
+        assert results == expected
+
 
 class TestInitializeMeanData:
     @pytest.mark.anyio
@@ -285,7 +318,7 @@ class TestInitializeMeanData:
         data_file_repo.get_bulk_file_path = mock_get_bulk_file_path
         mocker.patch("core.service.STATION_ID", 75000001)
         compute_history_patch = mocker.patch(
-            "core.service._compute_history_means", return_value=(5, 5)
+            "core.service._compute_history_means", return_value=[5, 5]
         )
 
         await initialize_mean_data(
@@ -293,7 +326,7 @@ class TestInitializeMeanData:
         )
 
         assert compute_history_patch.call_args_list[0] == call(
-            mocker.ANY, mocker.ANY, dt.date(2000, 1, 1), 1
+            mocker.ANY, dt.date(2000, 1, 1), 1
         )
         assert compute_history_patch.call_count == 366
         key_value_db_repo.post.assert_called_once_with(rains=[5] * 732)

@@ -1,0 +1,18 @@
+{
+    "request": {
+        "method": "POST",
+        "urlPattern": "/token",
+        "headers": {
+            "Authorization": {
+                "equalTo": "Basic test_app_id"
+            }
+        }
+    },
+    "response": {
+        "status": 200,
+        "headers": {
+            "Content-Type": "application/json"
+        },
+        "body": "{ \"access_token\": \"mocked.jwt.token\" }"
+    }
+}

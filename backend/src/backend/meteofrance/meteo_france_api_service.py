@@ -1,7 +1,7 @@
 import datetime as dt
-from functools import partial
 
 from aiohttp import ClientSession
+from async_lru import alru_cache
 from cachetools import TTLCache, cached
 from fastapi import HTTPException
 
@@ -28,9 +28,15 @@ async def get_last_mfapi_data_date() -> dt.date:
     Returns:
     - date: last data date available on DataFile backend
     """
-    now = dt.datetime.now(dt.timezone.utc)
-    delta_days = 2 if now.time() < dt.time(11, 35, 00) else 1
-    return now.date() - dt.timedelta(days=delta_days)
+    if settings.fake_last_data_day is None:
+        now = dt.datetime.now(dt.timezone.utc)
+        delta_days = 2 if now.time() < dt.time(11, 35, 00) else 1
+        last_data_date = now.date() - dt.timedelta(days=delta_days)
+    else:
+        last_data_date = dt.datetime.strptime(
+            settings.fake_last_data_day, "%Y-%m-%d"
+        ).date()
+    return last_data_date
 
 
 @cached(cache=TTLCache(maxsize=1, ttl=3600))
@@ -38,7 +44,7 @@ def get_client_session():
     return ClientSession()
 
 
-@cached(cache=TTLCache(maxsize=1, ttl=3600))
+@alru_cache(maxsize=1, ttl=3600)
 async def get_mf_access_token(session: ClientSession) -> str:
     """
     Get access token to authentify to Meteo France API.

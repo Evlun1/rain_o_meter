@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      AWS_REGION: eu-west-1
+      AWS_DEFAULT_REGION: eu-west-1
+      AWS_ACCESS_KEY_ID: DUMMYIDEXAMPLE
+      AWS_SECRET_ACCESS_KEY: DUMMYEXAMPLEKEY
+      AWS_ENDPOINT: http://dynamodb-local:8000
+      ENVIRONMENT: local
+      YEAR_BEG_INCL: 2019
+      YEAR_END_INCL: 2020
+      BACKEND_TABLE_NAME: rainfall
+      BACKEND_TABLE_KEY_NAME: timestamp_id
+      BACKEND_TABLE_VALUE_NAME: rain_mm
+      MF_CLIMATE_APP_ID: test_app_id
+      MF_TOKEN_URL: http://wiremock:8080/token
+      MF_CLIMATE_APP_URL: http://wiremock:8080/public/DPClim/v1
+      DGF_HISTORICAL_DATA_URL: http://wiremock:8080/history_data.csv.gz
+      FAKE_LAST_DATA_DAY: '2025-03-10'
+
+    depends_on:
+      dynamodb-local:
+        condition: service_healthy
+      wiremock:
+        condition: service_started
+
+  dynamodb-local:
+    image: amazon/dynamodb-local:latest
+    container_name: dynamodb-local
+    user: root
+    ports:
+      - "8001:8000"
+    volumes:
+     - "./docker/dynamodb:/home/dynamodblocal/data"
+    working_dir: /home/dynamodblocal
+    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath ./data"
+    healthcheck:
+      test: ["CMD-SHELL", '[ "$(curl -s -o /dev/null -I -w ''%{http_code}'' http://localhost:8000)" == "400" ]']
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  dynamodb-init:
+    image: amazon/aws-cli:latest
+    depends_on:
+      dynamodb-local:
+        condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: 'DUMMYIDEXAMPLE'
+      AWS_SECRET_ACCESS_KEY: 'DUMMYEXAMPLEKEY'
+      AWS_REGION: 'eu-west-1'
+    command: |
+      dynamodb create-table --endpoint-url http://dynamodb-local:8000 --table-name rainfall --attribute-definitions AttributeName=timestamp_id,AttributeType=S --key-schema AttributeName=timestamp_id,KeyType=HASH --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5
+
+  wiremock:
+    image: wiremock/wiremock:latest
+    ports:
+      - "8002:8080"
+    volumes:
+      - ./wiremock/mappings:/home/wiremock/mappings
+      - ./wiremock/__files:/home/wiremock/__files
+  

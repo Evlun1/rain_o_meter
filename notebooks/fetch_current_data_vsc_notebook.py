@@ -10,9 +10,7 @@
 # Usual Oauth2 procedure, have a look at https://portail-api.meteofrance.fr/web/fr/faq for more info.
 
 # %%
-APPLICATION_ID = (
-    "eDYyNUVvQXNQVGxORGR5R1lsMVdENENBR0JnYTp2RW5iQVZfRUhpZGQzeWliYnpCaDJVUFJHTXdh"
-)
+APPLICATION_ID = "REDACTED"
 TOKEN_URL = "https://portail-api.meteofrance.fr/token"
 
 # %%

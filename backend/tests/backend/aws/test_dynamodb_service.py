@@ -56,7 +56,7 @@ async def test_write_items(
 
     table = await dynamodb_resource.Table(settings.backend_table_name)
     response = await table.get_item(Key={settings.backend_table_key_name: "key1"})
-    assert response["Item"][settings.backend_table_value_name] == "1"
+    assert response["Item"][settings.backend_table_value_name] == 1
     await dynamodb_client.delete_table(TableName=settings.backend_table_name)
 
 

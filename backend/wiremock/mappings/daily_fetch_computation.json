@@ -1,0 +1,18 @@
+{
+    "request": {
+        "method": "GET",
+        "urlPattern": "/public/DPClim/v1/commande/fichier\\?id-cmde=12345",
+        "headers": {
+            "Authorization": {
+                "equalTo": "Bearer mocked.jwt.token"
+            }
+        }
+    },
+    "response": {
+        "status": 200,
+        "headers": {
+            "Content-Type": "text/csv"
+        },
+        "bodyFileName": "test_current_data_20250208_20250310.csv"
+    }
+}
