@@ -172,6 +172,14 @@ cython_debug/
 
 # Data files
 *.csv*
+# Allow wiremock files
+!backend/wiremock/__files/*
 
 # Exploration files
 *.ipynb
+
+# VSCode settings
+.vscode/
+
+# Local db files
+*.db

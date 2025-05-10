@@ -1,0 +1,13 @@
+{
+    "request": {
+        "method": "GET",
+        "urlPattern": "/history_data.csv.gz"
+    },
+    "response": {
+        "status": 200,
+        "headers": {
+            "Content-Type": "application/gzip"
+        },
+        "bodyFileName": "hist_file_sample.csv.gz"
+    }
+}
