@@ -306,14 +306,18 @@ class TestComputeHistoryMeans:
 
 class TestInitializeMeanData:
     @pytest.mark.anyio
-    async def test_initialize_mean_data(self, mocker, data_file_repo, key_value_db_repo):
+    async def test_initialize_mean_data(
+        self, mocker, data_file_repo, key_value_db_repo
+    ):
         input_year_beg_incl = 2020
         input_year_end_incl = 2020
         key_value_db_repo.has.return_value = False
 
         @asynccontextmanager
         async def mock_get_bulk_file_path():
-            yield Path(__file__).parent.joinpath("resources", "input_init_mean_data.csv")
+            yield Path(__file__).parent.joinpath(
+                "resources", "input_init_mean_data.csv"
+            )
 
         data_file_repo.get_bulk_file_path = mock_get_bulk_file_path
         mocker.patch("core.service.STATION_ID", 75000001)

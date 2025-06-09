@@ -4,6 +4,7 @@ from aiohttp import ClientSession
 from async_lru import alru_cache
 from cachetools import TTLCache, cached
 from fastapi import HTTPException
+from tenacity import retry, stop_after_attempt, wait_fixed, wait_random
 
 from settings import get_api_settings
 
@@ -101,6 +102,11 @@ async def launch_daily_data_computation(
     return payload["elaboreProduitAvecDemandeResponse"]["return"]
 
 
+@retry(
+    wait=wait_fixed(1) + wait_random(3),
+    stop=stop_after_attempt(10),
+    reraise=True,
+)
 async def fetch_daily_data_computation_results(
     session: ClientSession, id_command: str, token: str
 ) -> str:
@@ -114,13 +120,15 @@ async def fetch_daily_data_computation_results(
     Returns:
     - str: result CSV file as string
     """
+
     async with session.get(
         url=f"{settings.mf_climate_app_url}/{DOWNLOAD_ROUTE}",
         params={"id-cmde": id_command},
         headers={"Authorization": f"Bearer {token}"},
     ) as result_computation:
         text = await result_computation.text()
-        if (sc := result_computation.status) // 100 > 2:
+        if (sc := result_computation.status) // 100 > 2 or sc == 204:
+            # raise if exception or result yields no content (called too soon)
             raise HTTPException(status_code=sc, detail=text)
 
     return text

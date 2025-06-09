@@ -32,7 +32,7 @@ async def test_get_items(event_loop, mocker, settings, dynamodb_client):
 
     keys = ["key1", "key4"]
     result = await get_items(dynamodb_client, keys)
-    assert result == [1, 4]
+    assert result == {"key1": 1, "key4": 4}
     await dynamodb_client.delete_table(TableName=settings.backend_table_name)
 
 

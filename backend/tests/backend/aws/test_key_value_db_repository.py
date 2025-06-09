@@ -13,7 +13,7 @@ def key_value_db_repository(aws_session: Session) -> KeyValueDbRepository:
 @pytest.mark.anyio
 async def test_get(mocker, key_value_db_repository):
     input_keys = ["20250401-20250410", "M0401-M0410"]
-    mocked_values = [0, 10]
+    mocked_values = {"20250401-20250410": 0, "M0401-M0410": 10}
     get_mock = mocker.patch(
         "backend.aws.key_value_db_repository.get_items", return_value=mocked_values
     )

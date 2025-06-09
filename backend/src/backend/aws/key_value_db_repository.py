@@ -40,7 +40,7 @@ class KeyValueDbRepository:
         """
         async with self.session.client("dynamodb", **self.endpoint_url) as ddb_client:
             values = await get_items(ddb_client=ddb_client, keys=keys)
-        return {ts_id: rain_mm for ts_id, rain_mm in zip(keys, values)}
+        return values
 
     async def has(self, key: TimespanId) -> bool:
         """

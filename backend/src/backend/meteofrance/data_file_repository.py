@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
@@ -54,6 +55,7 @@ class DataFileRepository:
         id_command = await launch_daily_data_computation(
             session=self.session, begin_date=begin_date, token=self.mf_api_token
         )
+        await asyncio.sleep(0.5)  # MF backend needs some time to prepare file
         results = await fetch_daily_data_computation_results(
             session=self.session, id_command=id_command, token=self.mf_api_token
         )
