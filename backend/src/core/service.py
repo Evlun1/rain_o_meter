@@ -102,7 +102,11 @@ async def _compute_daily_data(
     this_month_rain = current_data_df.filter(pl.col("date") >= current_month_beg)[
         "rainfall_mm"
     ].sum()
-    return this_day_rain, this_month_rain, last_31_days_rain
+    return (
+        round(this_day_rain, 1),
+        round(this_month_rain, 1),
+        round(last_31_days_rain, 1),
+    )
 
 
 async def fetch_daily_data_if_not_in_cache(

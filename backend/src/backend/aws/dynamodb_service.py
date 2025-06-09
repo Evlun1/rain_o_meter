@@ -18,7 +18,7 @@ def get_aws_session() -> Session:
     return Session()
 
 
-async def get_items(ddb_client: DynamoDBClient, keys: list[str]) -> list[float]:
+async def get_items(ddb_client: DynamoDBClient, keys: list[str]) -> dict[str, float]:
     """
     Get rain items from DDB.
 
@@ -39,10 +39,12 @@ async def get_items(ddb_client: DynamoDBClient, keys: list[str]) -> list[float]:
     raw_result: BatchGetItemOutputTypeDef = await ddb_client.batch_get_item(
         RequestItems=request_items
     )
-    return [
-        float(rain_res[settings.backend_table_value_name]["N"])
+    return {
+        rain_res[settings.backend_table_key_name]["S"]: float(
+            rain_res[settings.backend_table_value_name]["N"]
+        )
         for rain_res in raw_result["Responses"][settings.backend_table_name]
-    ]
+    }
 
 
 async def write_items(

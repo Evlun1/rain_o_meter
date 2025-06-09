@@ -3,6 +3,7 @@ import datetime as dt
 import pytest
 from fastapi import HTTPException
 from freezegun import freeze_time
+from tenacity import stop_after_attempt, wait_none
 
 from backend.meteofrance.meteo_france_api_service import (
     fetch_daily_data_computation_results,
@@ -132,6 +133,8 @@ async def test_fetch_daily_data_computation_results_raise_if_error(
     )
 
     with pytest.raises(HTTPException):
+        fetch_daily_data_computation_results.retry.wait = wait_none()
+        fetch_daily_data_computation_results.retry.stop = stop_after_attempt(1)
         await fetch_daily_data_computation_results(
             session=aiohttp_session, id_command=input_id_command, token=input_token
         )
