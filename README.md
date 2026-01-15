@@ -23,13 +23,13 @@ While building this application, I also added clean code practises where I could
 ## Current state of things
 
 1. Add exploration notebooks ✓
-2. Add API backend on FastAPI
+2. Add API backend on FastAPI ✓
     1. Add uv, ruff, taskipy ✓
     2. Add asynchronous FastAPI source code ✓
     3. Add unit tests ✓
     4. Add docker compose for local integration testing ✓
-    5. Test deployment on AWS
-    6. Add CI for quality & test jobs
+    5. Test deployment on AWS ✓
+    6. Add CI for quality & test jobs ✓
 3. Add infra code on Terraform to deploy backend on a lambda with a private URL
 4. Add small front in React TS 
     1. Add front source code

@@ -28,7 +28,9 @@ class Settings(BaseSettings):
     mf_token_url: str = "https://portail-api.meteofrance.fr/token"
     mf_climate_app_id: str
     mf_climate_app_url: str = "https://public-api.meteofrance.fr/public/DPClim/v1"
-    dgf_historical_data_url: str = "https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/QUOT/Q_75_previous-1950-2023_RR-T-Vent.csv.gz"  # noqa
+    dgf_historical_data_url: str = (
+        "https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/QUOT/Q_75_previous-1950-2023_RR-T-Vent.csv.gz"  # noqa
+    )
     aws_endpoint: str | None = None
     fake_last_data_day: str | None = None
 
