@@ -17,11 +17,11 @@ It features three routes :
 - a fully aysnchronous FastAPI application (_async code, aioboto3, aiohttp_)
 - data validation packages (_pydantic for records, pandera for dataframes_)
 - local integration tests (_docker, docker-compose_)
+- add a CI for quality and tests (_github actions_)
 - and more, have a look :)
 
 Envisioned (but not added yet) clean code practises include :
-- add a CI for quality and tests
-- add a type checker such as mypy
+- add a type checker such as mypy or astral ty
 - use Polars LazyFrame instead of DataFrame for a little speedup
 - add commitizen to bump versions and format commits
 
@@ -52,7 +52,7 @@ uv sync
 Run code formatiing, code quality & code test checks :
 ```bash
 uv run task quality
-uv run task tests
+uv run task test
 ```
 
 Launch app locally :

@@ -8,7 +8,7 @@ from backend.aws.dynamodb_service import (
 
 
 @pytest.mark.anyio
-async def test_get_items(event_loop, mocker, settings, dynamodb_client):
+async def test_get_items(mocker, settings, dynamodb_client):
     # Setup mock data
     mocker.patch("backend.aws.dynamodb_service.settings", settings)
     await dynamodb_client.create_table(
@@ -37,9 +37,7 @@ async def test_get_items(event_loop, mocker, settings, dynamodb_client):
 
 
 @pytest.mark.anyio
-async def test_write_items(
-    event_loop, mocker, settings, dynamodb_resource, dynamodb_client
-):
+async def test_write_items(mocker, settings, dynamodb_resource, dynamodb_client):
     mocker.patch("backend.aws.dynamodb_service.settings", settings)
     await dynamodb_resource.create_table(
         TableName=settings.backend_table_name,
@@ -61,7 +59,7 @@ async def test_write_items(
 
 
 @pytest.mark.anyio
-async def test_has_item(event_loop, mocker, settings, dynamodb_client):
+async def test_has_item(mocker, settings, dynamodb_client):
     mocker.patch("backend.aws.dynamodb_service.settings", settings)
     await dynamodb_client.create_table(
         TableName=settings.backend_table_name,

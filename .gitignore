@@ -171,7 +171,7 @@ cython_debug/
 .pypirc
 
 # Data files
-*.csv*
+notebooks/*.csv*
 # Allow wiremock files
 !backend/wiremock/__files/*
 
