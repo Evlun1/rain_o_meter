@@ -21,7 +21,7 @@ It features three routes :
 
 Envisioned (but not added yet) clean code practises include :
 - add a CI for quality and tests
-- add a type checker such as mypy
+- add a type checker such as mypy or astral ty
 - use Polars LazyFrame instead of DataFrame for a little speedup
 - add commitizen to bump versions and format commits
 
@@ -52,7 +52,7 @@ uv sync
 Run code formatiing, code quality & code test checks :
 ```bash
 uv run task quality
-uv run task tests
+uv run task test
 ```
 
 Launch app locally :

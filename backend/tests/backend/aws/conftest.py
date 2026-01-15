@@ -49,9 +49,7 @@ _proxy_bypass = {
 def start_service(service_name, host, port):
     moto_svr_path = shutil.which("moto_server")
     args = [moto_svr_path, "-H", host, "-p", str(port)]
-    process = sp.Popen(
-        args, stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE
-    )  # shell=True
+    process = sp.Popen(args, stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE)  # shell=True
     url = "http://{host}:{port}".format(host=host, port=port)
 
     for i in range(0, 30):
@@ -122,9 +120,7 @@ def config(signature_version: str) -> AioConfig:
 
 
 @pytest.fixture
-async def dynamodb_resource(
-    region: str, config: AioConfig, event_loop, dynamodb_server: str
-):
+async def dynamodb_resource(region: str, config: AioConfig, dynamodb_server: str):
     session = Session(region_name=region, **moto_config())
 
     async with session.resource(
@@ -134,9 +130,7 @@ async def dynamodb_resource(
 
 
 @pytest.fixture
-async def dynamodb_client(
-    region: str, config: AioConfig, event_loop, dynamodb_server: str
-):
+async def dynamodb_client(region: str, config: AioConfig, dynamodb_server: str):
     session = Session(region_name=region, **moto_config())
 
     async with session.client(
