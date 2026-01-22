@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     environment: Environment
     api_title: str = "Rain O Meter API"
     api_description: str = "Expose Meteo France data as a rain meter."
-    api_version: str = "0.1.0"
+    api_version: str = "1.0.0"
     year_beg_incl: int
     year_end_incl: int
     backend_table_name: str = "rainfall"

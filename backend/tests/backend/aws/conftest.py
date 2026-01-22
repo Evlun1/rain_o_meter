@@ -49,7 +49,9 @@ _proxy_bypass = {
 def start_service(service_name, host, port):
     moto_svr_path = shutil.which("moto_server")
     args = [moto_svr_path, "-H", host, "-p", str(port)]
-    process = sp.Popen(args, stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE)  # shell=True
+    process = sp.Popen(
+        args, stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.PIPE
+    )  # shell=True
     url = "http://{host}:{port}".format(host=host, port=port)
 
     for i in range(0, 30):

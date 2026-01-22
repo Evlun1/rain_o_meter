@@ -183,3 +183,13 @@ notebooks/*.csv*
 
 # Local db files
 *.db
+
+# Zip build dir folder
+backend/zip_build_dir
+
+# Terraform infra
+.terraform/
+.terraform.lock.hcl
+lambda_package.zip
+terraform.tfstate*
+*.tfvars

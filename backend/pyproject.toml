@@ -1,6 +1,6 @@
 [project]
 name = "backend"
-version = "0.1.1"
+version = "1.0.0"
 description = "Rain o meter backend"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -58,3 +58,5 @@ mypy = { cmd = "mypy src tests", help = "type checks code" }  # OK I should add 
 quality = { cmd = "task format && task lint", help = "runs all quality checks" }
 
 ddb_admin = { cmd = "dynamodb-admin --port 8003 --dynamo-endpoint http://localhost:8001", help = "Launch dynamo db admin for local compose debug"}
+
+build = { cmd = "mkdir -p zip_build_dir && uv pip compile pyproject.toml -o requirements.txt && uv run pip install -r requirements.txt -t zip_build_dir && cp -r src zip_build_dir && rm requirements.txt", help = "Build zip local directory to deploy infra from local computer" }

@@ -68,3 +68,10 @@ Launch app locally with local dynamodb backend and mocked MeteoFrance / DataGouv
 docker compose up --build -d
 uv run task ddb_admin [optional, to browse local ddb contents]
 ```
+
+### Prepare for deployment
+
+Before deploying the backend infrastructure, you need to build a zip directory that will be uploaded to AWS lambda tool :
+```
+uv run task build
+```

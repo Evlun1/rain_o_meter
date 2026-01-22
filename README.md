@@ -56,3 +56,11 @@ This is the initial data exploration to sort MeteoFrance data, which isn't trivi
 You can launch it again locally with python.
 
 More infos in [Readme file](notebooks/README.md).
+
+## Infra
+
+This is the infrastructure specification for backend folder, using Terraform with AWS Provider.
+
+All deployment is done locally, you need to be connected to an AWS account of yours to do so.
+
+More infos in [Readme file](infra/README.md).
